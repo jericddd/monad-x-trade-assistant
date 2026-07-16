@@ -1,7 +1,7 @@
 import type { ParsedBuyCommand } from "./types.js";
 import { zeroAddress } from "viem";
 
-const BUY_COMMAND_PATTERN = /^buy\s+(\d+(?:\.\d+)?)\s*mon\s+of\s+(0x[a-fA-F0-9]{40})$/i;
+const BUY_COMMAND_PATTERN = /^buy\s+(\d+(?:\.\d+)?)\s*mon\s+(0x[a-fA-F0-9]{40})$/i;
 
 const MAX_DECIMALS = 18;
 
