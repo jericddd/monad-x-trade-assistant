@@ -9,9 +9,23 @@ function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function normalizeWhitespace(text: string): string {
+  return text.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
 function stripBotMention(text: string, botUsername: string): string {
   const mentionPattern = new RegExp(`@${escapeRegex(botUsername)}`, "gi");
-  return text.replace(mentionPattern, "").trim();
+  return text.replace(mentionPattern, " ");
+}
+
+/** Drop leading junk (e.g. Ξ) and start parsing at the buy keyword. */
+function extractBuySegment(text: string): string {
+  const normalized = normalizeWhitespace(text);
+  const buyIndex = normalized.search(/\bbuy\b/i);
+  if (buyIndex === -1) {
+    return normalized;
+  }
+  return normalized.slice(buyIndex).trim();
 }
 
 function validateAmount(amount: string): string | null {
@@ -53,7 +67,7 @@ export type ParseBuyCommandResult =
   | { ok: false; reason: "INVALID_COMMAND" | "INVALID_AMOUNT" };
 
 export function parseBuyCommand(rawText: string, botUsername: string): ParseBuyCommandResult {
-  const normalized = stripBotMention(rawText, botUsername).trim();
+  const normalized = extractBuySegment(stripBotMention(normalizeWhitespace(rawText), botUsername));
   const match = BUY_COMMAND_PATTERN.exec(normalized);
 
   if (!match) {

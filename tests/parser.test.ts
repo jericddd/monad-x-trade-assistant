@@ -27,6 +27,21 @@ describe("parseBuyCommand", () => {
     }
   });
 
+  it("accepts newline between mon and token address", () => {
+    const result = parseBuyCommand(`@monexmonad buy 1 mon\n${TOKEN}`, BOT);
+    expect(result.ok).toBe(true);
+  });
+
+  it("accepts leading symbol before buy after mention", () => {
+    const result = parseBuyCommand(`@monexmonad Ξ buy 1 mon ${TOKEN}`, BOT);
+    expect(result.ok).toBe(true);
+  });
+
+  it("accepts newline and symbol like a real X post", () => {
+    const result = parseBuyCommand(`@monexmonad Ξ buy 1 mon\n${TOKEN}`, BOT);
+    expect(result.ok).toBe(true);
+  });
+
   it("rejects old format with of", () => {
     const result = parseBuyCommand(`@monexmonad buy 100 mon of ${TOKEN}`, BOT);
     expect(result.ok).toBe(false);
