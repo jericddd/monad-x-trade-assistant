@@ -3,20 +3,20 @@ import { normalizeNumericUserId, normalizeOptionalNumericUserId } from "../src/x
 
 describe("normalizeNumericUserId", () => {
   it("trims whitespace from configured user ids", () => {
-    expect(normalizeNumericUserId(" 1618468570450776071\n", "X_BOT_USER_ID")).toBe(
+    expect(normalizeNumericUserId(" 1618468570450776071\n", "AUTHORIZED_X_USER_ID")).toBe(
       "1618468570450776071",
     );
   });
 
   it("rejects missing user ids", () => {
-    expect(() => normalizeNumericUserId(undefined, "X_BOT_USER_ID")).toThrow(
-      "X_BOT_USER_ID is not configured",
+    expect(() => normalizeNumericUserId(undefined, "AUTHORIZED_X_USER_ID")).toThrow(
+      "AUTHORIZED_X_USER_ID is not configured",
     );
   });
 
   it("rejects non-numeric user ids", () => {
-    expect(() => normalizeNumericUserId("monexmonad", "X_BOT_USER_ID")).toThrow(
-      "X_BOT_USER_ID must be a numeric user id",
+    expect(() => normalizeNumericUserId("monexmonad", "AUTHORIZED_X_USER_ID")).toThrow(
+      "AUTHORIZED_X_USER_ID must be a numeric user id",
     );
   });
 });
