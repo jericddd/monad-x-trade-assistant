@@ -134,9 +134,9 @@ export class RealXClient implements XClient {
     });
 
     if (!response.ok) {
-      if (this.credentials.botUserId) {
-        const id = normalizeNumericUserId(this.credentials.botUserId, "X_BOT_USER_ID");
-        this.cachedBotUser = { id, username: "monexmonad" };
+      const fallbackId = normalizeOptionalNumericUserId(this.credentials.botUserId);
+      if (fallbackId) {
+        this.cachedBotUser = { id: fallbackId, username: "monexmonad" };
         return this.cachedBotUser;
       }
       const detail = await readXApiError(response);
@@ -157,9 +157,8 @@ export class RealXClient implements XClient {
   }
 
   async fetchMentions(input: { sinceId?: string; botUserId?: string }): Promise<MentionsResponse> {
-    const botUserId = input.botUserId
-      ? normalizeNumericUserId(input.botUserId, "X_BOT_USER_ID")
-      : (await this.resolveBotUser()).id;
+    const botUserId =
+      normalizeOptionalNumericUserId(input.botUserId) ?? (await this.resolveBotUser()).id;
     const sinceId = normalizeOptionalNumericUserId(input.sinceId);
 
     const url = new URL(`${X_API_BASE}/users/${botUserId}/mentions`);
@@ -254,7 +253,9 @@ export function createXClient(env: Record<string, unknown>): XClient {
   const apiSecret = env.X_API_SECRET;
   const accessToken = env.X_ACCESS_TOKEN;
   const accessTokenSecret = env.X_ACCESS_TOKEN_SECRET;
-  const botUserId = typeof env.X_BOT_USER_ID === "string" ? env.X_BOT_USER_ID.trim() : undefined;
+  const botUserId = normalizeOptionalNumericUserId(
+    typeof env.X_BOT_USER_ID === "string" ? env.X_BOT_USER_ID : undefined,
+  );
 
   if (
     typeof apiKey !== "string" ||
@@ -274,6 +275,6 @@ export function createXClient(env: Record<string, unknown>): XClient {
     apiSecret: apiSecret.trim(),
     accessToken: accessToken.trim(),
     accessTokenSecret: accessTokenSecret.trim(),
-    botUserId: botUserId || undefined,
+    botUserId,
   });
 }
