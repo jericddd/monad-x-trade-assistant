@@ -12,7 +12,7 @@ class_name = "TradeCoordinator"
 
 [[migrations]]
 tag = "v1"
-new_classes = ["TradeCoordinator"]
+new_sqlite_classes = ["TradeCoordinator"]
 
 [vars]
 TRADING_ENABLED = "false"
