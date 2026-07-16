@@ -235,33 +235,38 @@ export class RealXClient implements XClient {
   }
 }
 
+/** Trim and strip accidental surrounding quotes from wrangler/PowerShell pastes. */
+function sanitizeSecret(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1).trim() || undefined;
+  }
+  return trimmed;
+}
+
 export function createXClient(env: Record<string, unknown>): XClient {
   if (env.USE_MOCK_X === true || env.USE_MOCK_X === "true") {
     return new MockXClient();
   }
 
-  const apiKey = env.X_API_KEY;
-  const apiSecret = env.X_API_SECRET;
-  const accessToken = env.X_ACCESS_TOKEN;
-  const accessTokenSecret = env.X_ACCESS_TOKEN_SECRET;
+  const apiKey = sanitizeSecret(env.X_API_KEY);
+  const apiSecret = sanitizeSecret(env.X_API_SECRET);
+  const accessToken = sanitizeSecret(env.X_ACCESS_TOKEN);
+  const accessTokenSecret = sanitizeSecret(env.X_ACCESS_TOKEN_SECRET);
 
-  if (
-    typeof apiKey !== "string" ||
-    typeof apiSecret !== "string" ||
-    typeof accessToken !== "string" ||
-    typeof accessTokenSecret !== "string" ||
-    !apiKey ||
-    !apiSecret ||
-    !accessToken ||
-    !accessTokenSecret
-  ) {
+  if (!apiKey || !apiSecret || !accessToken || !accessTokenSecret) {
     return new MockXClient();
   }
 
   return new RealXClient({
-    apiKey: apiKey.trim(),
-    apiSecret: apiSecret.trim(),
-    accessToken: accessToken.trim(),
-    accessTokenSecret: accessTokenSecret.trim(),
+    apiKey,
+    apiSecret,
+    accessToken,
+    accessTokenSecret,
   });
 }
