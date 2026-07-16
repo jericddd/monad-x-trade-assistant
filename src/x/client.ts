@@ -1,6 +1,6 @@
 import { buildOAuth1AuthorizationHeader } from "./oauth1.js";
 import { createTradeError } from "../trading/errors.js";
-import { normalizeNumericUserId, normalizeOptionalNumericUserId } from "./user-id.js";
+import { normalizeOptionalNumericUserId } from "./user-id.js";
 
 const X_API_BASE = "https://api.twitter.com/2";
 
