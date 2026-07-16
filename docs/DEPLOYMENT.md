@@ -8,7 +8,11 @@
 
 ## Required secrets
 
-Set via `wrangler secret put` or GitHub environment secrets:
+Set via `wrangler secret put` or GitHub environment secrets.
+
+**See [CREDENTIALS.md](./CREDENTIALS.md) for which account each secret comes from.**
+
+### Bot account (`@monexmonad`)
 
 - `X_BEARER_TOKEN`
 - `X_API_KEY`
@@ -16,9 +20,18 @@ Set via `wrangler secret put` or GitHub environment secrets:
 - `X_ACCESS_TOKEN`
 - `X_ACCESS_TOKEN_SECRET`
 - `X_BOT_USER_ID`
+
+### Authorized account (you)
+
 - `AUTHORIZED_X_USER_ID`
+
+### Monad
+
 - `MONAD_RPC_URL`
-- `TRADE_WALLET_PRIVATE_KEY` (required only for live trading)
+
+### Live trading only
+
+- `TRADE_WALLET_PRIVATE_KEY`
 
 Non-secret vars may live in `wrangler.toml` `[vars]` (already populated for Nad.fun mainnet defaults).
 

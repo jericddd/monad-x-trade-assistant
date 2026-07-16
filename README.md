@@ -87,6 +87,7 @@ npm run build
 
 ## Documentation
 
+- [docs/CREDENTIALS.md](docs/CREDENTIALS.md) — **which account each secret comes from**
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - [docs/SECURITY.md](docs/SECURITY.md)
 - [docs/RUNBOOK.md](docs/RUNBOOK.md)
