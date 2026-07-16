@@ -41,6 +41,20 @@ describe("parseBuyCommand", () => {
     expect(result.ok).toBe(true);
   });
 
+  it("accepts double @monexmonad when replying inside a MonExMonad thread", () => {
+    const result = parseBuyCommand(`@monexmonad @monexmonad buy 1 mon ${TOKEN}`, BOT);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.command.amountMon).toBe("1");
+      expect(result.command.tokenAddress).toBe(TOKEN);
+    }
+  });
+
+  it("accepts buy command without mention when already replying to the bot", () => {
+    const result = parseBuyCommand(`buy 1 mon ${TOKEN}`, BOT);
+    expect(result.ok).toBe(true);
+  });
+
   it("rejects old format with of", () => {
     const result = parseBuyCommand(`@monexmonad buy 100 mon of ${TOKEN}`, BOT);
     expect(result.ok).toBe(false);
