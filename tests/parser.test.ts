@@ -36,6 +36,11 @@ describe("parseBuyCommand", () => {
     }
   });
 
+  it("accepts newline after mention when X wraps the tweet", () => {
+    const result = parseBuyCommand(`@monexmonad\nbuy 1 mon ${TOKEN}`, BOT);
+    expect(result.ok).toBe(true);
+  });
+
   it("rejects old format with of", () => {
     const result = parseBuyCommand(`@monexmonad buy 100 mon of ${TOKEN}`, BOT);
     expect(result.ok).toBe(false);
