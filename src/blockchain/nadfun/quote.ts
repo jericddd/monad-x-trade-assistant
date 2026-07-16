@@ -1,5 +1,15 @@
+import { parseEther } from "viem";
 import type { AppEnv } from "../../env.js";
-import { NADFUN_MAINNET } from "./config.js";
+import { NADFUN_MAINNET, DEFAULT_ALLOWED_ROUTERS } from "./config.js";
+import {
+  createBlockchainClients,
+  createPublicBlockchainClient,
+  assertConfiguredChainId,
+} from "../client.js";
+import { hasContractBytecode, isTokenLocked, queryLensQuote } from "./lens.js";
+import { simulateBuyTransaction } from "./simulate-buy.js";
+import { privateKeyToAccount } from "viem/accounts";
+import type { Hex } from "viem";
 
 export type QuoteResult = {
   routerAddress: `0x${string}`;
@@ -96,18 +106,141 @@ export class MockSimulationProvider implements SimulationProvider {
   }
 }
 
+export class RealQuoteProvider implements QuoteProvider {
+  constructor(
+    private readonly env: Partial<AppEnv>,
+    private readonly publicClient = createPublicBlockchainClient(env),
+  ) {}
+
+  async getBuyQuote(input: {
+    tokenAddress: `0x${string}`;
+    amountInWei: bigint;
+  }): Promise<QuoteResult> {
+    await assertConfiguredChainId(this.publicClient, this.env.MONAD_CHAIN_ID ?? 143);
+
+    const hasBytecode = await hasContractBytecode({
+      publicClient: this.publicClient,
+      tokenAddress: input.tokenAddress,
+    });
+
+    if (!hasBytecode) {
+      return {
+        routerAddress: NADFUN_MAINNET.BONDING_CURVE_ROUTER,
+        expectedAmountOut: 0n,
+        isLocked: false,
+        hasBytecode: false,
+      };
+    }
+
+    const lensAddress = this.env.NADFUN_LENS_ADDRESS ?? NADFUN_MAINNET.LENS;
+    const quote = await queryLensQuote({
+      publicClient: this.publicClient,
+      lensAddress,
+      tokenAddress: input.tokenAddress,
+      amountInWei: input.amountInWei,
+    });
+
+    const locked = await isTokenLocked({
+      publicClient: this.publicClient,
+      lensAddress,
+      tokenAddress: input.tokenAddress,
+    });
+
+    return {
+      routerAddress: quote.routerAddress,
+      expectedAmountOut: quote.expectedAmountOut,
+      isLocked: locked,
+      hasBytecode: true,
+    };
+  }
+}
+
+export class RealSimulationProvider implements SimulationProvider {
+  constructor(
+    private readonly env: Partial<AppEnv>,
+    private readonly publicClient = createPublicBlockchainClient(env),
+  ) {}
+
+  async simulateBuy(input: {
+    tokenAddress: `0x${string}`;
+    amountInWei: bigint;
+    amountOutMin: bigint;
+    routerAddress: `0x${string}`;
+    recipient: `0x${string}`;
+    deadline: bigint;
+  }): Promise<{ ok: true } | { ok: false; reason: string }> {
+    return simulateBuyTransaction({
+      publicClient: this.publicClient,
+      account: input.recipient,
+      routerAddress: input.routerAddress,
+      tokenAddress: input.tokenAddress,
+      amountInWei: input.amountInWei,
+      amountOutMin: input.amountOutMin,
+      recipient: input.recipient,
+      deadline: input.deadline,
+    });
+  }
+}
+
 export function createMockWalletAddress(): `0x${string}` {
   return "0x0000000000000000000000000000000000000001";
 }
 
-export function createProviders(_env: Partial<AppEnv>): {
+export function resolveWalletAddress(env: Partial<AppEnv>): `0x${string}` {
+  if (env.TRADE_WALLET_PRIVATE_KEY) {
+    return privateKeyToAccount(env.TRADE_WALLET_PRIVATE_KEY as Hex).address;
+  }
+  return createMockWalletAddress();
+}
+
+export function shouldUseMockBlockchain(env: Partial<AppEnv>): boolean {
+  if (env.USE_MOCK_BLOCKCHAIN === true) {
+    return true;
+  }
+  if (!env.MONAD_RPC_URL || !env.NADFUN_LENS_ADDRESS) {
+    return true;
+  }
+  return false;
+}
+
+export type TradeProviders = {
   quoteProvider: QuoteProvider;
   simulationProvider: SimulationProvider;
   walletAddress: `0x${string}`;
-} {
+  mode: "mock" | "real";
+};
+
+export function createProviders(env: Partial<AppEnv>): TradeProviders {
+  if (shouldUseMockBlockchain(env)) {
+    return {
+      quoteProvider: new MockQuoteProvider(),
+      simulationProvider: new MockSimulationProvider(),
+      walletAddress: resolveWalletAddress(env),
+      mode: "mock",
+    };
+  }
+
   return {
-    quoteProvider: new MockQuoteProvider(),
-    simulationProvider: new MockSimulationProvider(),
-    walletAddress: createMockWalletAddress(),
+    quoteProvider: new RealQuoteProvider(env),
+    simulationProvider: new RealSimulationProvider(env),
+    walletAddress: resolveWalletAddress(env),
+    mode: "real",
   };
 }
+
+export async function createLiveExecutionContext(env: Partial<AppEnv>) {
+  const clients = await createBlockchainClients(env);
+  const allowedRouters = (
+    env.NADFUN_ALLOWED_ROUTER_ADDRESSES?.length
+      ? env.NADFUN_ALLOWED_ROUTER_ADDRESSES
+      : [...DEFAULT_ALLOWED_ROUTERS]
+  ) as `0x${string}`[];
+
+  return {
+    ...clients,
+    allowedRouters,
+    minReserveWei: parseEther(env.MIN_WALLET_RESERVE_MON ?? "1"),
+  };
+}
+
+export { createBlockchainClients };

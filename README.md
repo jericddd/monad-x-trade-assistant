@@ -4,59 +4,77 @@ Personal-only X command bot that lets one authorized X account buy Nad.fun token
 
 **Warning:** When live trading is enabled, this service controls a funded hot wallet and can spend MON automatically. Use a dedicated wallet with limited funds only.
 
+## Status
+
+MVP Phases 1–4 are implemented:
+
+- Phase 1: parser, auth, Durable Object, dry-run foundation
+- Phase 2: real Monad RPC, Nad.fun Lens quotes, bytecode checks, simulation
+- Phase 3: restricted signer, live submission, receipt confirmation
+- Phase 4: cron polling + confirmation, emergency stop, ops docs
+
+**Defaults remain safe:** `TRADING_ENABLED=false`, `TRADE_DRY_RUN=true`.
+
 ## Architecture
 
-- Cloudflare Worker with cron-triggered X mention polling
+- Cloudflare Worker with cron-triggered X mention polling + confirmation
 - `TradeCoordinator` Durable Object for idempotency, limits, and serialized execution
 - Strict deterministic command parser (no LLM)
 - Nad.fun Lens quote flow with router allowlisting
-- Dry-run mode enabled by default
+- Restricted signer: `executeNadfunBuy` only (no generic sendTransaction API)
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for details.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Command format
-
-Only one authorized numeric X user ID may trade.
 
 ```
 @monexmonad buy 100 mon of 0x978Ae7298D48Cf0f8d1fdB26abC12bfACFcC7777
 @monexmonad buy 100mon of 0x978Ae7298D48Cf0f8d1fdB26abC12bfACFcC7777
 ```
 
-This spends exactly 100 native MON on the token at the supplied contract address.
+Spends exactly N native MON buying the token at the supplied contract.
 
 ## Local setup
 
 ```bash
 npm ci
 cp .dev.vars.example .dev.vars
-# fill in .dev.vars
+# fill credentials + MONAD_RPC_URL
 npm run dev
-```
-
-Health check:
-
-```bash
 curl http://127.0.0.1:8787/health
 ```
 
-## Environment setup
+## Stress-test plan (recommended)
 
-Copy `.env.example` or `.dev.vars.example` and configure:
+Keep dry-run on first:
 
-- X API credentials and authorized user ID
-- Monad RPC URL and chain ID
-- Nad.fun Lens and allowlisted router addresses
-- Trading safety limits
+1. Deploy with `TRADE_DRY_RUN=true` and `TRADING_ENABLED=false`
+2. Configure real X credentials + `AUTHORIZED_X_USER_ID`
+3. Configure `MONAD_RPC_URL` (mainnet) and Nad.fun addresses
+4. Post buy commands from the authorized account only
+5. Verify dry-run replies match Nad.fun UI estimates roughly
+6. Confirm unauthorized accounts get no public security details
+7. Confirm duplicate tweets are ignored
+8. Only then consider a tiny live trade (`MAX_MON_PER_TRADE=0.1`)
 
-Trading defaults:
+## Enable live trading
 
-- `TRADING_ENABLED=false`
-- `TRADE_DRY_RUN=true`
+Only after dry-run validation:
 
-## Dry-run setup
+```bash
+# Cloudflare secrets / vars
+TRADING_ENABLED=true
+TRADE_DRY_RUN=false
+MAX_MON_PER_TRADE=0.1
+MAX_MON_PER_DAY=0.5
+MAX_TRADES_PER_HOUR=2
+```
 
-Leave `TRADE_DRY_RUN=true`. The bot will parse commands, validate the author, query quotes (mock in Phase 1), simulate, and reply with estimated results without signing or broadcasting.
+Fund the dedicated wallet with a small MON amount first.
+
+## Emergency stop
+
+Set `TRADING_ENABLED=false` (and preferably `TRADE_DRY_RUN=true`) and redeploy immediately.
 
 ## Test commands
 
@@ -67,51 +85,11 @@ npm run typecheck
 npm run build
 ```
 
-## Cloudflare setup
+## Documentation
 
-1. Create a Cloudflare Workers project
-2. Configure secrets from `.env.example`
-3. Deploy with Wrangler or GitHub Actions
-
-Required resources:
-
-- Worker
-- Durable Object binding: `TRADE_COORDINATOR`
-- Cron trigger: every minute
-
-## Deployment
-
-Manual deploy:
-
-```bash
-npm run deploy
-```
-
-GitHub Actions deploy workflow is manual dispatch only.
-
-## Enable trading
-
-Only after dry-run validation on mainnet:
-
-1. Fund a dedicated wallet with a small MON amount
-2. Set conservative limits
-3. Set `TRADE_DRY_RUN=false`
-4. Set `TRADING_ENABLED=true`
-5. Deploy
-
-## Stop trading
-
-Set `TRADING_ENABLED=false` and redeploy immediately. Optionally set `TRADE_DRY_RUN=true`.
-
-## Current limitations (Phase 1)
-
-- Mock blockchain quote and simulation providers
-- No live transaction signing or broadcasting
-- Real Nad.fun Lens and Monad RPC integration planned for Phase 2
-- Live execution planned for Phase 3
-
-## Official Nad.fun sources
-
-- https://nad.fun/trading.md
-- https://nad.fun/abi.md
-- https://github.com/Naddotfun/contract-v3-abi
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- [docs/SECURITY.md](docs/SECURITY.md)
+- [docs/RUNBOOK.md](docs/RUNBOOK.md)
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
+- [docs/NADFUN_INTEGRATION.md](docs/NADFUN_INTEGRATION.md)
+- [docs/COMMAND_SPEC.md](docs/COMMAND_SPEC.md)

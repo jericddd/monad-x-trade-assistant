@@ -14,16 +14,32 @@
 | Bonding Curve Router | `0x6F6B8F1a20703309951a5127c45B49b1CD981A22` |
 | DEX Router           | `0x0B79d71AE99528D1dB24A4148b5f4F865cc2b137` |
 
-## Buy flow
+## Buy flow (implemented)
 
-1. Call Lens `getAmountOut(token, amountIn, true)`
-2. Receive router address and expected output
-3. Validate router against `NADFUN_ALLOWED_ROUTER_ADDRESSES`
-4. Build router `buy` transaction with slippage-protected minimum output
-5. Simulate, sign, and broadcast through the restricted signer
+1. Validate token has contract bytecode
+2. Call Lens `getAmountOut(token, amountIn, true)`
+3. Check `isLocked(token)` when available
+4. Validate returned router against `NADFUN_ALLOWED_ROUTER_ADDRESSES`
+5. Calculate `amountOutMin` with bigint slippage BPS
+6. Build router `buy({ amountOutMin, token, to, deadline })`
+7. Simulate via `publicClient.simulateContract`
+8. Estimate gas and enforce wallet reserve
+9. Sign/broadcast only through `executeNadfunBuy` when live trading is enabled
+10. Persist hash, reply, then confirm receipt asynchronously
 
-## Phase status
+## Price impact
 
-- Phase 1: mock quote and simulation providers
-- Phase 2: real Lens, bytecode validation, and simulation
-- Phase 3: restricted signer and live submission
+Reliable on-chain price-impact data is not consistently exposed by Lens for all tokens.
+The system therefore relies on:
+
+- Max trade size
+- Slippage BPS
+- Quote validation
+- Simulation
+- Router allowlist
+- Wallet reserve
+
+## Mock vs real providers
+
+- Real providers are used when `MONAD_RPC_URL` and `NADFUN_LENS_ADDRESS` are set and `USE_MOCK_BLOCKCHAIN` is not `true`
+- Unit tests use mock providers and never hit mainnet or a funded wallet

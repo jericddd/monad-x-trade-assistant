@@ -32,6 +32,23 @@ export function pruneHourlyTimestamps(
   return timestamps.filter((timestamp) => nowMs - timestamp < windowMs);
 }
 
+export function normalizeLimitState(state: LimitState, nowMs = Date.now()): LimitState {
+  const today = utcDateKey(new Date(nowMs));
+  if (state.dailyDateUtc !== today) {
+    return {
+      ...state,
+      dailyDateUtc: today,
+      dailySpentWei: 0n,
+      hourlyTradeTimestamps: pruneHourlyTimestamps(state.hourlyTradeTimestamps, nowMs),
+    };
+  }
+
+  return {
+    ...state,
+    hourlyTradeTimestamps: pruneHourlyTimestamps(state.hourlyTradeTimestamps, nowMs),
+  };
+}
+
 export function checkTradeLimits(input: {
   state: LimitState;
   requestedAmountWei: bigint;
@@ -41,23 +58,13 @@ export function checkTradeLimits(input: {
   nowMs?: number;
 }): LimitCheckResult {
   const nowMs = input.nowMs ?? Date.now();
-  const today = utcDateKey(new Date(nowMs));
-
-  let state = input.state;
-  if (state.dailyDateUtc !== today) {
-    state = {
-      ...state,
-      dailyDateUtc: today,
-      dailySpentWei: 0n,
-    };
-  }
+  const state = normalizeLimitState(input.state, nowMs);
 
   if (input.requestedAmountWei > input.maxMonPerTradeWei) {
     return { ok: false, code: "AMOUNT_TOO_LARGE" };
   }
 
-  const hourlyCount = pruneHourlyTimestamps(state.hourlyTradeTimestamps, nowMs).length;
-  if (hourlyCount >= input.maxTradesPerHour) {
+  if (state.hourlyTradeTimestamps.length >= input.maxTradesPerHour) {
     return { ok: false, code: "HOURLY_LIMIT_EXCEEDED" };
   }
 
@@ -69,20 +76,12 @@ export function checkTradeLimits(input: {
   return { ok: true };
 }
 
-export function reserveTradeAmount(
-  state: LimitState,
-  amountWei: bigint,
-  nowMs: number,
-): LimitState {
-  const hourlyTradeTimestamps = [
-    ...pruneHourlyTimestamps(state.hourlyTradeTimestamps, nowMs),
-    nowMs,
-  ];
-
+/** Reserve spend while a live trade is submitting (does not count hourly yet). */
+export function reserveSpend(state: LimitState, amountWei: bigint, nowMs = Date.now()): LimitState {
+  const normalized = normalizeLimitState(state, nowMs);
   return {
-    ...state,
-    hourlyTradeTimestamps,
-    reservedWei: state.reservedWei + amountWei,
+    ...normalized,
+    reservedWei: normalized.reservedWei + amountWei,
   };
 }
 
@@ -93,12 +92,35 @@ export function releaseReservation(state: LimitState, amountWei: bigint): LimitS
   };
 }
 
-export function commitReservation(state: LimitState, amountWei: bigint): LimitState {
+export function commitReservation(
+  state: LimitState,
+  amountWei: bigint,
+  nowMs = Date.now(),
+): LimitState {
+  const normalized = normalizeLimitState(state, nowMs);
   return {
-    ...state,
-    dailySpentWei: state.dailySpentWei + amountWei,
-    reservedWei: state.reservedWei > amountWei ? state.reservedWei - amountWei : 0n,
+    ...normalized,
+    dailySpentWei: normalized.dailySpentWei + amountWei,
+    reservedWei: normalized.reservedWei > amountWei ? normalized.reservedWei - amountWei : 0n,
+    hourlyTradeTimestamps: [...normalized.hourlyTradeTimestamps, nowMs],
   };
+}
+
+export function recordHourlyTrade(state: LimitState, nowMs = Date.now()): LimitState {
+  const normalized = normalizeLimitState(state, nowMs);
+  return {
+    ...normalized,
+    hourlyTradeTimestamps: [...normalized.hourlyTradeTimestamps, nowMs],
+  };
+}
+
+/** @deprecated Use reserveSpend + commitReservation */
+export function reserveTradeAmount(
+  state: LimitState,
+  amountWei: bigint,
+  nowMs: number,
+): LimitState {
+  return reserveSpend(state, amountWei, nowMs);
 }
 
 export function isDuplicateTrade(existing: TradeRecord | null): boolean {

@@ -32,6 +32,7 @@ export type TradeRecord = {
   blockNumber?: string;
   failureCode?: string;
   failureMessageSafe?: string;
+  lastReplyStatus?: TradeStatus;
   createdAt: string;
   updatedAt: string;
 };

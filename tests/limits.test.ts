@@ -67,10 +67,10 @@ describe("limits", () => {
     expect(pruneHourlyTimestamps(timestamps, now)).toEqual([now - 500_000]);
   });
 
-  it("reserves trade amount in limit state", () => {
+  it("reserves trade amount without counting hourly yet", () => {
     const now = Date.now();
     const updated = reserveTradeAmount(createInitialLimitState(), parseEther("5"), now);
     expect(updated.reservedWei).toBe(parseEther("5"));
-    expect(updated.hourlyTradeTimestamps).toHaveLength(1);
+    expect(updated.hourlyTradeTimestamps).toHaveLength(0);
   });
 });
