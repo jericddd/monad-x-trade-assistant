@@ -1,0 +1,26 @@
+name = "monad-x-trade-assistant"
+main = "src/index.ts"
+compatibility_date = "2025-07-01"
+compatibility_flags = ["nodejs_compat"]
+
+[triggers]
+crons = ["* * * * *"]
+
+[[durable_objects.bindings]]
+name = "TRADE_COORDINATOR"
+class_name = "TradeCoordinator"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["TradeCoordinator"]
+
+[vars]
+TRADING_ENABLED = "false"
+TRADE_DRY_RUN = "true"
+MAX_MON_PER_TRADE = "10"
+MAX_MON_PER_DAY = "30"
+MAX_TRADES_PER_HOUR = "3"
+DEFAULT_SLIPPAGE_BPS = "300"
+MAX_PRICE_IMPACT_BPS = "1000"
+TRADE_DEADLINE_SECONDS = "120"
+MIN_WALLET_RESERVE_MON = "1"

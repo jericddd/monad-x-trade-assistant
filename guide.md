@@ -40,27 +40,27 @@ A dedicated backend wallet signs and submits the transaction automatically.
 
 This is:
 
-* A standalone repository
-* A personal-only tool
-* A single-user system
-* A backend-controlled hot wallet
-* A strict X command parser
-* A Nad.fun purchase assistant
-* A Monad transaction executor
+- A standalone repository
+- A personal-only tool
+- A single-user system
+- A backend-controlled hot wallet
+- A strict X command parser
+- A Nad.fun purchase assistant
+- A Monad transaction executor
 
 This is not:
 
-* Part of the MonEx browser game
-* A public trading platform
-* A custodial wallet service
-* A multi-user bot
-* A general-purpose wallet
-* A general transaction-signing API
-* An AI trading agent
-* A natural-language trading assistant
-* A token discovery tool
-* A portfolio manager
-* A browser extension
+- Part of the MonEx browser game
+- A public trading platform
+- A custodial wallet service
+- A multi-user bot
+- A general-purpose wallet
+- A general transaction-signing API
+- An AI trading agent
+- A natural-language trading assistant
+- A token discovery tool
+- A portfolio manager
+- A browser extension
 
 Do not add features outside the defined MVP.
 
@@ -91,33 +91,33 @@ Use the defaults defined below.
 
 Use:
 
-* TypeScript
-* Node.js-compatible Cloudflare Workers
-* Cloudflare Workers
-* Cloudflare Durable Objects
-* Cloudflare KV only for non-atomic configuration or cached data
-* Viem for EVM interactions
-* Vitest for testing
-* Wrangler for local development and deployment
-* ESLint
-* Prettier
-* Zod for environment and payload validation
-* GitHub Actions for continuous integration
-* npm as the package manager
+- TypeScript
+- Node.js-compatible Cloudflare Workers
+- Cloudflare Workers
+- Cloudflare Durable Objects
+- Cloudflare KV only for non-atomic configuration or cached data
+- Viem for EVM interactions
+- Vitest for testing
+- Wrangler for local development and deployment
+- ESLint
+- Prettier
+- Zod for environment and payload validation
+- GitHub Actions for continuous integration
+- npm as the package manager
 
 Use strict TypeScript.
 
 Do not use:
 
-* Express
-* Next.js
-* React
-* A frontend framework
-* A browser wallet
-* Ethers unless a Nad.fun integration absolutely requires it
-* JavaScript Number for blockchain values
-* Cloudflare KV as a transaction lock
-* An LLM for parsing commands
+- Express
+- Next.js
+- React
+- A frontend framework
+- A browser wallet
+- Ethers unless a Nad.fun integration absolutely requires it
+- JavaScript Number for blockchain values
+- Cloudflare KV as a transaction lock
+- An LLM for parsing commands
 
 The project does not need a user-facing website for the MVP.
 
@@ -195,11 +195,11 @@ Use the numeric X user ID for authorization.
 
 Do not authorize using:
 
-* Username
-* Display name
-* Profile URL
-* Tweet text
-* X verification status
+- Username
+- Display name
+- Profile URL
+- Tweet text
+- X verification status
 
 The X username may change.
 
@@ -233,38 +233,38 @@ Examples that must work:
 
 Allow:
 
-* Case-insensitive keywords
-* Extra whitespace between words
-* No space between the amount and MON
-* The exact bot mention before the command
-* Leading or trailing whitespace
+- Case-insensitive keywords
+- Extra whitespace between words
+- No space between the amount and MON
+- The exact bot mention before the command
+- Leading or trailing whitespace
 
 Reject:
 
-* buy max mon
-* buy all mon
-* buy around 100 mon
-* buy one hundred mon
-* buy $100
-* buy 100 usd
-* buy 100 tokens
-* buy 100 mon to
-* buy 100 mon of this
-* Nad.fun URLs instead of a contract
-* Multiple contract addresses
-* Multiple commands in one post
-* Scientific notation
-* Hexadecimal amounts
-* Negative amounts
-* Zero
-* Commas
-* More than 18 decimals
-* Extra instructions after the contract
-* Sell commands
-* Transfer commands
-* Approval commands
-* Withdraw commands
-* Arbitrary calldata
+- buy max mon
+- buy all mon
+- buy around 100 mon
+- buy one hundred mon
+- buy $100
+- buy 100 usd
+- buy 100 tokens
+- buy 100 mon to
+- buy 100 mon of this
+- Nad.fun URLs instead of a contract
+- Multiple contract addresses
+- Multiple commands in one post
+- Scientific notation
+- Hexadecimal amounts
+- Negative amounts
+- Zero
+- Commas
+- More than 18 decimals
+- Extra instructions after the contract
+- Sell commands
+- Transfer commands
+- Approval commands
+- Withdraw commands
+- Arbitrary calldata
 
 After removing the exact bot mention, enforce the full string.
 
@@ -292,23 +292,23 @@ BUY
 
 Do not implement:
 
-* Sell
-* Transfer
-* Withdraw
-* Approval
-* Bridge
-* Limit order
-* Stop loss
-* Copy trading
-* Multiple wallets
-* Multiple authorized users
-* Token deployment
-* Automatic token discovery
-* Market scanning
-* AI recommendations
-* Arbitrary DEX execution
-* Wallet imports through a website
-* Private-key submission through X
+- Sell
+- Transfer
+- Withdraw
+- Approval
+- Bridge
+- Limit order
+- Stop loss
+- Copy trading
+- Multiple wallets
+- Multiple authorized users
+- Token deployment
+- Automatic token discovery
+- Market scanning
+- AI recommendations
+- Arbitrary DEX execution
+- Wallet imports through a website
+- Private-key submission through X
 
 # WALLET MODEL
 
@@ -322,27 +322,27 @@ TRADE_WALLET_PRIVATE_KEY
 
 Never store the private key in:
 
-* Source code
-* Git
-* GitHub Actions logs
-* Cloudflare KV
-* Durable Object storage
-* A database
-* Test fixtures
-* X posts
-* X replies
-* Error messages
-* Request payloads
-* API responses
-* Frontend code
+- Source code
+- Git
+- GitHub Actions logs
+- Cloudflare KV
+- Durable Object storage
+- A database
+- Test fixtures
+- X posts
+- X replies
+- Error messages
+- Request payloads
+- API responses
+- Frontend code
 
 Never log:
 
-* The private key
-* A partial private key
-* The raw signed transaction
-* Authentication headers
-* Environment secrets
+- The private key
+- A partial private key
+- The raw signed transaction
+- Authentication headers
+- Environment secrets
 
 The wallet signer must remain inside the private trade-execution layer.
 
@@ -410,10 +410,10 @@ Do not use addresses copied from random posts or unverified websites.
 
 Document the exact official source used for:
 
-* Lens ABI
-* Bonding-curve router ABI
-* Graduated-token or DEX router ABI
-* Mainnet contract addresses
+- Lens ABI
+- Bonding-curve router ABI
+- Graduated-token or DEX router ABI
+- Mainnet contract addresses
 
 # NAD.FUN BUY FLOW
 
@@ -431,8 +431,9 @@ getAmountOut(tokenAddress, amountIn, true)
 
 8. Retrieve:
 
-   * Expected output
-   * Correct router
+   - Expected output
+   - Correct router
+
 9. Confirm expected output is greater than zero.
 10. Confirm the returned router is allowlisted.
 11. Check locked or unavailable status when supported by the official Lens.
@@ -455,8 +456,8 @@ Use the router returned by the official Nad.fun Lens.
 
 Support both:
 
-* Tokens still using the Nad.fun bonding curve
-* Nad.fun tokens that graduated to the supported DEX
+- Tokens still using the Nad.fun bonding curve
+- Nad.fun tokens that graduated to the supported DEX
 
 Do not invent routing rules.
 
@@ -522,17 +523,17 @@ Dry-run mode must be enabled by default.
 
 When TRADE_DRY_RUN=true:
 
-* Parse the command
-* Validate the author
-* Validate the contract
-* Query Nad.fun
-* Calculate expected output
-* Calculate minimum output
-* Simulate the transaction
-* Persist the dry-run result
-* Reply with the estimated result
-* Never sign
-* Never broadcast
+- Parse the command
+- Validate the author
+- Validate the contract
+- Query Nad.fun
+- Calculate expected output
+- Calculate minimum output
+- Simulate the transaction
+- Persist the dry-run result
+- Reply with the estimated result
+- Never sign
+- Never broadcast
 
 TRADE_DRY_RUN=true must override TRADING_ENABLED=true.
 
@@ -567,12 +568,12 @@ Do not invent price-impact calculations.
 
 When reliable calculation is unavailable, document this limitation and rely on:
 
-* Maximum trade size
-* Slippage
-* Quote validation
-* Simulation
-* Router allowlist
-* Wallet reserve
+- Maximum trade size
+- Slippage
+- Quote validation
+- Simulation
+- Router allowlist
+- Wallet reserve
 
 # IDEMPOTENCY
 
@@ -650,10 +651,10 @@ If the network times out after transaction submission, do not assume failure.
 
 Mark the record UNKNOWN and investigate using:
 
-* Known transaction hash
-* Wallet nonce
-* Receipt lookup
-* Recent wallet transactions where supported
+- Known transaction hash
+- Wallet nonce
+- Receipt lookup
+- Recent wallet transactions where supported
 
 Never automatically make a replacement purchase for the same tweet.
 
@@ -665,21 +666,21 @@ TradeCoordinator
 
 It must:
 
-* Serialize transactions from the wallet
-* Prevent nonce collisions
-* Enforce tweet idempotency
-* Enforce hourly limits atomically
-* Enforce daily limits atomically
-* Reserve spending during submission
-* Store transaction state
-* Prevent two simultaneous broadcasts
-* Sanitize results before returning them
+- Serialize transactions from the wallet
+- Prevent nonce collisions
+- Enforce tweet idempotency
+- Enforce hourly limits atomically
+- Enforce daily limits atomically
+- Reserve spending during submission
+- Store transaction state
+- Prevent two simultaneous broadcasts
+- Sanitize results before returning them
 
 Do not use:
 
-* An in-memory mutex
-* Cloudflare KV as a lock
-* Race-prone read-then-write checks
+- An in-memory mutex
+- Cloudflare KV as a lock
+- Race-prone read-then-write checks
 
 Only one transaction may enter the signing and submission stage at a time.
 
@@ -689,11 +690,11 @@ Use UTC.
 
 Enforce:
 
-* Maximum MON per trade
-* Maximum MON submitted per UTC day
-* Maximum number of trades in a rolling hour
-* One transaction per tweet
-* One wallet transaction at a time
+- Maximum MON per trade
+- Maximum MON submitted per UTC day
+- Maximum number of trades in a rolling hour
+- One transaction per tweet
+- One wallet transaction at a time
 
 Reserve the requested amount when a trade enters SUBMITTING.
 
@@ -783,17 +784,17 @@ the command will not be retried automatically
 
 Requirements:
 
-* Reply to the original post
-* Keep replies concise
-* Never include private information
-* Never include full wallet balance
-* Never include stack traces
-* Never include RPC URLs
-* Never include secrets
-* Never claim no funds were spent after a transaction may have been broadcast
-* Shorten token addresses for display
-* Include an explorer link only from trusted configuration
-* Avoid duplicate replies for the same status
+- Reply to the original post
+- Keep replies concise
+- Never include private information
+- Never include full wallet balance
+- Never include stack traces
+- Never include RPC URLs
+- Never include secrets
+- Never claim no funds were spent after a transaction may have been broadcast
+- Shorten token addresses for display
+- Include an explorer link only from trusted configuration
+- Avoid duplicate replies for the same status
 
 # ERROR CODES
 
@@ -835,8 +836,8 @@ X_REPLY_FAILED
 
 Separate:
 
-* Technical internal errors
-* Safe public messages
+- Technical internal errors
+- Safe public messages
 
 # LOGGING
 
@@ -844,25 +845,25 @@ Use structured JSON logs.
 
 Include:
 
-* Request ID
-* Tweet ID
-* Author ID
-* Trade status
-* Token address
-* Requested amount
-* Router
-* Transaction hash
-* Failure code
-* Duration
+- Request ID
+- Tweet ID
+- Author ID
+- Trade status
+- Token address
+- Requested amount
+- Router
+- Transaction hash
+- Failure code
+- Duration
 
 Never include:
 
-* Private key
-* X secrets
-* Internal authentication secrets
-* Raw signed transaction
-* Authorization headers
-* Full environment object
+- Private key
+- X secrets
+- Internal authentication secrets
+- Raw signed transaction
+- Authorization headers
+- Full environment object
 
 Create a central redaction utility.
 
@@ -967,16 +968,16 @@ Fail closed when required configuration is missing.
 
 Production startup must reject:
 
-* Invalid private-key format
-* Invalid X user IDs
-* Invalid contract addresses
-* Empty router allowlist
-* Invalid chain ID
-* Invalid numeric limits
-* Slippage above the hard maximum
-* Negative values
-* Trading enabled without a private key
-* Real trading enabled while required Nad.fun addresses are missing
+- Invalid private-key format
+- Invalid X user IDs
+- Invalid contract addresses
+- Empty router allowlist
+- Invalid chain ID
+- Invalid numeric limits
+- Slippage above the hard maximum
+- Negative values
+- Trading enabled without a private key
+- Real trading enabled while required Nad.fun addresses are missing
 
 Do not expose secret values in validation errors.
 
@@ -997,12 +998,12 @@ It may return:
 
 Do not expose:
 
-* Wallet address unless deliberately configured as public
-* Wallet balance
-* Contract addresses
-* RPC URL
-* X account IDs
-* Secrets
+- Wallet address unless deliberately configured as public
+- Wallet balance
+- Contract addresses
+- RPC URL
+- X account IDs
+- Secrets
 
 # TESTING
 
@@ -1038,36 +1039,36 @@ Must reject:
 
 Also test:
 
-* Wrong X author ID
-* Duplicate tweet
-* Trading disabled
-* Dry-run override
-* Per-trade limit
-* Hourly limit
-* Daily limit
-* Invalid token address
-* No contract bytecode
-* Lens quote failure
-* Zero output
-* Router not allowlisted
-* Locked token
-* Insufficient wallet balance
-* Minimum reserve violation
-* Simulation failure
-* Successful simulation
-* Successful submission
-* Transaction revert
-* Unknown submission result
-* Duplicate event while submitting
-* Concurrent commands
-* Nonce serialization
-* Bigint slippage calculation
-* Chain ID mismatch
-* Error sanitization
-* Secret redaction
-* X reply deduplication
-* Mention cursor persistence
-* One failed mention not blocking the next mention
+- Wrong X author ID
+- Duplicate tweet
+- Trading disabled
+- Dry-run override
+- Per-trade limit
+- Hourly limit
+- Daily limit
+- Invalid token address
+- No contract bytecode
+- Lens quote failure
+- Zero output
+- Router not allowlisted
+- Locked token
+- Insufficient wallet balance
+- Minimum reserve violation
+- Simulation failure
+- Successful simulation
+- Successful submission
+- Transaction revert
+- Unknown submission result
+- Duplicate event while submitting
+- Concurrent commands
+- Nonce serialization
+- Bigint slippage calculation
+- Chain ID mismatch
+- Error sanitization
+- Secret redaction
+- X reply deduplication
+- Mention cursor persistence
+- One failed mention not blocking the next mention
 
 Mock all network services in automated tests.
 
@@ -1083,12 +1084,12 @@ Create:
 
 Run on pull requests and pushes to main:
 
-* npm ci
-* npm run format:check
-* npm run lint
-* npm run typecheck
-* npm test
-* npm run build
+- npm ci
+- npm run format:check
+- npm run lint
+- npm run typecheck
+- npm test
+- npm run build
 
 Create:
 
@@ -1096,12 +1097,12 @@ Create:
 
 Requirements:
 
-* Manual workflow dispatch initially
-* Deploy through Wrangler
-* Use GitHub environment secrets
-* Do not print Cloudflare or application secrets
-* Production deployment must not automatically enable trading
-* Document all required GitHub secrets
+- Manual workflow dispatch initially
+- Deploy through Wrangler
+- Use GitHub environment secrets
+- Do not print Cloudflare or application secrets
+- Production deployment must not automatically enable trading
+- Document all required GitHub secrets
 
 # PACKAGE SCRIPTS
 
@@ -1123,44 +1124,44 @@ npm run tail
 
 Create a useful README.md with:
 
-* Project summary
-* Warning that this controls a funded hot wallet
-* Dedicated-wallet requirement
-* Architecture
-* Command format
-* Local setup
-* Environment setup
-* Dry-run setup
-* Test commands
-* Cloudflare setup
-* Deployment
-* How to enable trading
-* How to stop trading
-* Current limitations
+- Project summary
+- Warning that this controls a funded hot wallet
+- Dedicated-wallet requirement
+- Architecture
+- Command format
+- Local setup
+- Environment setup
+- Dry-run setup
+- Test commands
+- Cloudflare setup
+- Deployment
+- How to enable trading
+- How to stop trading
+- Current limitations
 
 Create docs/ARCHITECTURE.md with:
 
-* Full system diagram
-* Worker responsibilities
-* Durable Object responsibilities
-* Blockchain execution flow
-* Data flow
-* Trust boundaries
+- Full system diagram
+- Worker responsibilities
+- Durable Object responsibilities
+- Blockchain execution flow
+- Data flow
+- Trust boundaries
 
 Create docs/SECURITY.md with:
 
-* Threat model
-* X account compromise
-* Private-key compromise
-* RPC compromise
-* Duplicate X delivery
-* Replay attacks
-* Nonce collisions
-* Malicious token contracts
-* Router allowlisting
-* Logging restrictions
-* Wallet-funding recommendations
-* Incident response
+- Threat model
+- X account compromise
+- Private-key compromise
+- RPC compromise
+- Duplicate X delivery
+- Replay attacks
+- Nonce collisions
+- Malicious token contracts
+- Router allowlisting
+- Logging restrictions
+- Wallet-funding recommendations
+- Incident response
 
 Create docs/RUNBOOK.md with:
 
@@ -1190,42 +1191,42 @@ Implement the repository so that it supports phased rollout.
 
 Phase 1:
 
-* Project scaffolding
-* Environment validation
-* Parser
-* X author authorization
-* X polling abstraction
-* Durable Object storage
-* Idempotency
-* Mock quote provider
-* Dry-run responses
-* Tests
+- Project scaffolding
+- Environment validation
+- Parser
+- X author authorization
+- X polling abstraction
+- Durable Object storage
+- Idempotency
+- Mock quote provider
+- Dry-run responses
+- Tests
 
 Phase 2:
 
-* Real Monad RPC client
-* Official Nad.fun Lens integration
-* Contract bytecode validation
-* Router allowlist
-* Real quote generation
-* Real simulation
-* No signing or broadcasting by default
+- Real Monad RPC client
+- Official Nad.fun Lens integration
+- Contract bytecode validation
+- Router allowlist
+- Real quote generation
+- Real simulation
+- No signing or broadcasting by default
 
 Phase 3:
 
-* Restricted signer
-* Dedicated test wallet
-* Live transaction submission
-* Very low spending limit
-* Transaction receipt confirmation
+- Restricted signer
+- Dedicated test wallet
+- Live transaction submission
+- Very low spending limit
+- Transaction receipt confirmation
 
 Phase 4:
 
-* Production deployment
-* Monitoring
-* Emergency stop
-* Key-rotation procedure
-* Operational runbook
+- Production deployment
+- Monitoring
+- Emergency stop
+- Key-rotation procedure
+- Operational runbook
 
 # MVP ACCEPTANCE CRITERIA
 
@@ -1260,26 +1261,26 @@ The MVP is complete when:
 
 Do not implement:
 
-* A frontend
-* User accounts
-* Multiple users
-* Multiple wallets
-* Wallet import UI
-* Selling
-* Transfers
-* Approvals
-* Bridging
-* Limit orders
-* Stop losses
-* AI command interpretation
-* Token recommendations
-* Automatic token discovery
-* Portfolio tracking
-* Public access
-* Subscription billing
-* Mobile application
-* Telegram or Discord support
-* Arbitrary smart-contract calls
+- A frontend
+- User accounts
+- Multiple users
+- Multiple wallets
+- Wallet import UI
+- Selling
+- Transfers
+- Approvals
+- Bridging
+- Limit orders
+- Stop losses
+- AI command interpretation
+- Token recommendations
+- Automatic token discovery
+- Portfolio tracking
+- Public access
+- Subscription billing
+- Mobile application
+- Telegram or Discord support
+- Arbitrary smart-contract calls
 
 # FINAL RESPONSE AFTER IMPLEMENTATION
 
