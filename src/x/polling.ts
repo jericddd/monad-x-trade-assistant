@@ -8,6 +8,7 @@ export type PollResult = {
   processed: number;
   failed: number;
   newestCursor?: string;
+  skippedOverlap?: boolean;
 };
 
 async function getCoordinatorStub(env: AppEnv): Promise<DurableObjectStub> {
@@ -36,10 +37,19 @@ async function setCursor(stub: DurableObjectStub, cursor: string): Promise<void>
   });
 }
 
+async function acquirePollLock(stub: DurableObjectStub): Promise<boolean> {
+  const response = await stub.fetch("https://trade-coordinator/poll-lock", { method: "POST" });
+  const body = (await response.json()) as { acquired: boolean };
+  return body.acquired;
+}
+
+async function releasePollLock(stub: DurableObjectStub): Promise<void> {
+  await stub.fetch("https://trade-coordinator/poll-lock", { method: "DELETE" });
+}
+
 async function processThroughCoordinator(
   stub: DurableObjectStub,
   mention: { tweetId: string; authorId: string; text: string },
-  env: Partial<AppEnv>,
 ): Promise<ProcessMentionResponse> {
   const response = await stub.fetch("https://trade-coordinator/process-mention", {
     method: "POST",
@@ -48,76 +58,148 @@ async function processThroughCoordinator(
       tweetId: mention.tweetId,
       authorId: mention.authorId,
       text: mention.text,
-      env,
     }),
   });
 
   return (await response.json()) as ProcessMentionResponse;
 }
 
+async function markReplied(
+  stub: DurableObjectStub,
+  tweetId: string,
+  status: string,
+): Promise<void> {
+  await stub.fetch("https://trade-coordinator/mark-replied", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ tweetId, status }),
+  });
+}
+
 export async function pollMentions(env: AppEnv, client: XClient): Promise<PollResult> {
   const stub = await getCoordinatorStub(env);
-  const sinceId = (await getCursor(stub)) ?? undefined;
+  const acquired = await acquirePollLock(stub);
+  if (!acquired) {
+    logInfo("poll_skipped_overlap", {});
+    return { processed: 0, failed: 0, skippedOverlap: true };
+  }
 
-  const mentions = await client.fetchMentions({
-    sinceId,
-    botUserId: env.X_BOT_USER_ID,
-  });
+  try {
+    const sinceId = (await getCursor(stub)) ?? undefined;
 
-  let processed = 0;
-  let failed = 0;
-  const replyQueue: Array<{ tweetId: string; replyText?: string; replied?: boolean }> = [];
+    const mentions = await client.fetchMentions({
+      sinceId,
+      botUserId: env.X_BOT_USER_ID,
+    });
 
-  for (const tweet of mentions.tweets) {
-    try {
-      const result = await processThroughCoordinator(
-        stub,
-        {
+    let processed = 0;
+    let failed = 0;
+    const replyQueue: Array<{
+      tweetId: string;
+      replyText?: string;
+      replied?: boolean;
+      status?: string;
+    }> = [];
+
+    for (const tweet of mentions.tweets) {
+      try {
+        const result = await processThroughCoordinator(stub, {
           tweetId: tweet.id,
           authorId: tweet.authorId,
           text: tweet.text,
-        },
-        env,
-      );
+        });
 
-      if (result.replyText) {
-        replyQueue.push({ tweetId: tweet.id, replyText: result.replyText });
-      }
+        if (result.replyText) {
+          replyQueue.push({
+            tweetId: tweet.id,
+            replyText: result.replyText,
+            status: result.status,
+          });
+        }
 
-      if (result.ok) {
-        processed += 1;
-      } else {
+        if (result.ok) {
+          processed += 1;
+        } else if (result.failureCode !== "UNAUTHORIZED_AUTHOR") {
+          failed += 1;
+        }
+      } catch (error) {
         failed += 1;
+        logError("mention_processing_failed", {
+          tweetId: tweet.id,
+          message: error instanceof Error ? error.message : "unknown",
+        });
       }
-    } catch (error) {
-      failed += 1;
-      logError("mention_processing_failed", {
-        tweetId: tweet.id,
-        message: error instanceof Error ? error.message : "unknown",
-      });
     }
+
+    await processMentionReplies(client, replyQueue);
+
+    for (const item of replyQueue) {
+      if (item.replied && item.status) {
+        await markReplied(stub, item.tweetId, item.status);
+      }
+    }
+
+    const newestCursor = mentions.newestId ?? sinceId;
+    if (newestCursor) {
+      await setCursor(stub, newestCursor);
+    }
+
+    logInfo("poll_completed", {
+      processed,
+      failed,
+      newestCursor,
+    });
+
+    return {
+      processed,
+      failed,
+      newestCursor,
+    };
+  } finally {
+    await releasePollLock(stub);
   }
+}
+
+export async function confirmPendingTrades(
+  env: AppEnv,
+  client: XClient,
+): Promise<{ checked: number; confirmed: number }> {
+  const stub = await getCoordinatorStub(env);
+  const response = await stub.fetch("https://trade-coordinator/confirm-pending", {
+    method: "POST",
+  });
+  const body = (await response.json()) as {
+    checked: number;
+    confirmed: number;
+    reverted: number;
+    replies: Array<{ tweetId: string; replyText: string; status: string }>;
+  };
+
+  const replyQueue = body.replies.map((reply) => ({
+    tweetId: reply.tweetId,
+    replyText: reply.replyText,
+    status: reply.status,
+    replied: false as boolean | undefined,
+  }));
 
   await processMentionReplies(client, replyQueue);
 
-  const newestCursor = mentions.newestId ?? sinceId;
-  if (newestCursor) {
-    await setCursor(stub, newestCursor);
+  for (const item of replyQueue) {
+    if (item.replied && item.status) {
+      await markReplied(stub, item.tweetId, item.status);
+    }
   }
 
-  logInfo("poll_completed", {
-    processed,
-    failed,
-    newestCursor,
+  logInfo("confirmation_pass", {
+    checked: body.checked,
+    confirmed: body.confirmed,
+    reverted: body.reverted,
   });
 
-  return {
-    processed,
-    failed,
-    newestCursor,
-  };
+  return { checked: body.checked, confirmed: body.confirmed };
 }
 
 export async function runScheduledPoll(env: AppEnv, client: XClient): Promise<void> {
   await pollMentions(env, client);
+  await confirmPendingTrades(env, client);
 }

@@ -21,8 +21,16 @@ function formatTokenAmount(value: string | undefined): string {
 
 export type ReplyKind = "dry_run" | "submitted" | "confirmed" | "rejected" | "failed" | "unknown";
 
-export function buildTradeReply(record: TradeRecord, kind: ReplyKind): string {
+export function buildTradeReply(
+  record: TradeRecord,
+  kind: ReplyKind,
+  explorerBaseUrl?: string,
+): string {
   const tokenShort = shortenAddress(record.tokenAddress);
+  const explorerLine =
+    record.txHash && explorerBaseUrl
+      ? `explorer: ${explorerBaseUrl.replace(/\/?$/, "/")}${record.txHash}`
+      : "";
 
   switch (kind) {
     case "dry_run":
@@ -43,6 +51,7 @@ export function buildTradeReply(record: TradeRecord, kind: ReplyKind): string {
         `token: ${tokenShort}`,
         `minimum tokens: ${formatTokenAmount(record.minimumAmountOut)}`,
         record.txHash ? `tx: ${shortenAddress(record.txHash)}` : "",
+        explorerLine,
       ]
         .filter(Boolean)
         .join("\n");
@@ -55,6 +64,7 @@ export function buildTradeReply(record: TradeRecord, kind: ReplyKind): string {
         `received: ${formatTokenAmount(record.expectedAmountOut)} TOKEN`,
         `token: ${tokenShort}`,
         record.txHash ? `tx: ${shortenAddress(record.txHash)}` : "",
+        explorerLine,
       ]
         .filter(Boolean)
         .join("\n");

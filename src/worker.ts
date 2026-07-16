@@ -3,9 +3,18 @@ import { healthResponse } from "./routes/health.js";
 import { createXClient } from "./x/client.js";
 import { runScheduledPoll } from "./x/polling.js";
 import { parseEnvLenient } from "./env.js";
+import { logError, logInfo } from "./utils/logging.js";
 
 export interface Env extends AppEnv {
   TRADE_COORDINATOR: DurableObjectNamespace;
+}
+
+function toWorkerEnv(env: Env): AppEnv {
+  const parsed = parseEnvLenient(env as unknown as Record<string, unknown>);
+  return {
+    ...parsed,
+    TRADE_COORDINATOR: env.TRADE_COORDINATOR,
+  } as AppEnv;
 }
 
 async function handleRequest(request: Request, env: Env): Promise<Response> {
@@ -25,9 +34,20 @@ const worker = {
   },
 
   async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
-    const parsed = parseEnvLenient(env as unknown as Record<string, unknown>) as Env;
-    const client = createXClient(parsed as unknown as Record<string, unknown>);
-    await runScheduledPoll(parsed, client);
+    try {
+      const parsed = toWorkerEnv(env);
+      const client = createXClient(env as unknown as Record<string, unknown>);
+      logInfo("scheduled_tick_started", {
+        tradingEnabled: parsed.TRADING_ENABLED === true,
+        dryRun: parsed.TRADE_DRY_RUN !== false,
+      });
+      await runScheduledPoll(parsed, client);
+      logInfo("scheduled_tick_completed", {});
+    } catch (error) {
+      logError("scheduled_tick_failed", {
+        message: error instanceof Error ? error.message : "unknown",
+      });
+    }
   },
 };
 

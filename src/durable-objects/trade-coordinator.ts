@@ -1,13 +1,16 @@
 import type { ParsedBuyCommand } from "../commands/types.js";
 import { isAuthorizedAuthor, parseBuyCommand } from "../commands/parse-buy-command.js";
-import type { AppEnv } from "../env.js";
+import { parseEnvLenient, type AppEnv } from "../env.js";
 import { sha256Hex } from "../utils/hash.js";
 import { SAFE_ERROR_MESSAGES, type TradeErrorCode } from "../trading/errors.js";
 import { toFailureCode, toSafePublicReason } from "../trading/sanitize-error.js";
 import {
   checkTradeLimits,
+  commitReservation,
   createInitialLimitState,
-  isDuplicateTrade,
+  recordHourlyTrade,
+  releaseReservation,
+  reserveSpend,
   type LimitState,
 } from "../trading/limits.js";
 import { isIdempotentDuplicate } from "../trading/idempotency.js";
@@ -18,19 +21,23 @@ import {
   type TradeRecord,
 } from "../trading/trade-record.js";
 import { TradeService } from "../trading/trade-service.js";
+import { buildTradeReply } from "../trading/replies.js";
 import { createProviders } from "../blockchain/nadfun/quote.js";
+import { createPublicBlockchainClient } from "../blockchain/client.js";
+import { getTransactionReceipt } from "../blockchain/receipts.js";
 import { parseEther } from "viem";
+import { logInfo, logWarn } from "../utils/logging.js";
 
 type CoordinatorState = {
   limits: LimitState;
   processingLock: boolean;
+  pollLock: boolean;
 };
 
 export type ProcessMentionRequest = {
   tweetId: string;
   authorId: string;
   text: string;
-  env: Partial<AppEnv>;
 };
 
 export type ProcessMentionResponse = {
@@ -42,12 +49,36 @@ export type ProcessMentionResponse = {
 
 const CURSOR_KEY = "poll:cursor";
 const LIMITS_KEY = "limits:state";
+const PENDING_INDEX_KEY = "pending:submitted";
 
 export class TradeCoordinator implements DurableObject {
   private readonly state: DurableObjectState;
+  private readonly env: Partial<AppEnv>;
 
-  constructor(state: DurableObjectState) {
+  constructor(state: DurableObjectState, env: Record<string, unknown>) {
     this.state = state;
+    this.env = parseEnvLenient(env);
+    // Preserve secret fields that parseEnvLenient may omit.
+    this.env = {
+      ...this.env,
+      X_BEARER_TOKEN: typeof env.X_BEARER_TOKEN === "string" ? env.X_BEARER_TOKEN : undefined,
+      X_API_KEY: typeof env.X_API_KEY === "string" ? env.X_API_KEY : undefined,
+      X_API_SECRET: typeof env.X_API_SECRET === "string" ? env.X_API_SECRET : undefined,
+      X_ACCESS_TOKEN: typeof env.X_ACCESS_TOKEN === "string" ? env.X_ACCESS_TOKEN : undefined,
+      X_ACCESS_TOKEN_SECRET:
+        typeof env.X_ACCESS_TOKEN_SECRET === "string" ? env.X_ACCESS_TOKEN_SECRET : undefined,
+      MONAD_RPC_URL: typeof env.MONAD_RPC_URL === "string" ? env.MONAD_RPC_URL : undefined,
+      MONAD_CHAIN_ID:
+        env.MONAD_CHAIN_ID !== undefined ? Number(env.MONAD_CHAIN_ID) : this.env.MONAD_CHAIN_ID,
+      NADFUN_LENS_ADDRESS:
+        typeof env.NADFUN_LENS_ADDRESS === "string"
+          ? (env.NADFUN_LENS_ADDRESS as `0x${string}`)
+          : undefined,
+      TRADE_WALLET_PRIVATE_KEY:
+        typeof env.TRADE_WALLET_PRIVATE_KEY === "string" ? env.TRADE_WALLET_PRIVATE_KEY : undefined,
+      USE_MOCK_BLOCKCHAIN: env.USE_MOCK_BLOCKCHAIN === true || env.USE_MOCK_BLOCKCHAIN === "true",
+      USE_MOCK_X: env.USE_MOCK_X === true || env.USE_MOCK_X === "true",
+    };
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -66,9 +97,25 @@ export class TradeCoordinator implements DurableObject {
       }
     }
 
+    if (url.pathname === "/poll-lock") {
+      if (request.method === "POST") {
+        const acquired = await this.acquirePollLock();
+        return Response.json({ acquired });
+      }
+      if (request.method === "DELETE") {
+        await this.releasePollLock();
+        return Response.json({ ok: true });
+      }
+    }
+
     if (url.pathname === "/process-mention" && request.method === "POST") {
       const body = (await request.json()) as ProcessMentionRequest;
       const result = await this.processMention(body);
+      return Response.json(result);
+    }
+
+    if (url.pathname === "/confirm-pending" && request.method === "POST") {
+      const result = await this.confirmPendingTrades();
       return Response.json(result);
     }
 
@@ -79,6 +126,15 @@ export class TradeCoordinator implements DurableObject {
       }
       const record = await this.getTradeRecord(tweetId);
       return Response.json({ record });
+    }
+
+    if (url.pathname === "/mark-replied" && request.method === "POST") {
+      const body = (await request.json()) as { tweetId: string; status: TradeRecord["status"] };
+      const record = await this.getTradeRecord(body.tweetId);
+      if (record) {
+        await this.saveTradeRecord(updateTradeRecord(record, { lastReplyStatus: body.status }));
+      }
+      return Response.json({ ok: true });
     }
 
     return new Response("not found", { status: 404 });
@@ -92,9 +148,23 @@ export class TradeCoordinator implements DurableObject {
     await this.state.storage.put(CURSOR_KEY, cursor);
   }
 
+  private async acquirePollLock(): Promise<boolean> {
+    const state = await this.getCoordinatorState();
+    if (state.pollLock) {
+      return false;
+    }
+    await this.saveCoordinatorState({ ...state, pollLock: true });
+    return true;
+  }
+
+  private async releasePollLock(): Promise<void> {
+    const state = await this.getCoordinatorState();
+    await this.saveCoordinatorState({ ...state, pollLock: false });
+  }
+
   private async getCoordinatorState(): Promise<CoordinatorState> {
     const stored = await this.state.storage.get<CoordinatorState>(LIMITS_KEY);
-    return stored ?? { limits: createInitialLimitState(), processingLock: false };
+    return stored ?? { limits: createInitialLimitState(), processingLock: false, pollLock: false };
   }
 
   private async saveCoordinatorState(state: CoordinatorState): Promise<void> {
@@ -109,8 +179,28 @@ export class TradeCoordinator implements DurableObject {
     await this.state.storage.put(tradeRecordKey(record.tweetId), record);
   }
 
+  private async getPendingSubmitted(): Promise<string[]> {
+    return (await this.state.storage.get<string[]>(PENDING_INDEX_KEY)) ?? [];
+  }
+
+  private async setPendingSubmitted(tweetIds: string[]): Promise<void> {
+    await this.state.storage.put(PENDING_INDEX_KEY, tweetIds);
+  }
+
+  private async addPendingSubmitted(tweetId: string): Promise<void> {
+    const current = await this.getPendingSubmitted();
+    if (!current.includes(tweetId)) {
+      await this.setPendingSubmitted([...current, tweetId]);
+    }
+  }
+
+  private async removePendingSubmitted(tweetId: string): Promise<void> {
+    const current = await this.getPendingSubmitted();
+    await this.setPendingSubmitted(current.filter((id) => id !== tweetId));
+  }
+
   async processMention(input: ProcessMentionRequest): Promise<ProcessMentionResponse> {
-    const env = input.env;
+    const env = this.env;
     const botUsername = env.X_BOT_USERNAME ?? "monexmonad";
     const authorizedUserId = env.AUTHORIZED_X_USER_ID ?? "";
 
@@ -118,7 +208,6 @@ export class TradeCoordinator implements DurableObject {
       return {
         ok: false,
         failureCode: "UNAUTHORIZED_AUTHOR",
-        replyText: `trade rejected\n\nreason: ${SAFE_ERROR_MESSAGES.UNAUTHORIZED_AUTHOR}`,
       };
     }
 
@@ -136,7 +225,10 @@ export class TradeCoordinator implements DurableObject {
       return {
         ok: false,
         failureCode: "DUPLICATE_TWEET",
-        replyText: `trade rejected\n\nreason: ${SAFE_ERROR_MESSAGES.DUPLICATE_TWEET}`,
+        replyText:
+          existing?.lastReplyStatus === existing?.status
+            ? undefined
+            : `trade rejected\n\nreason: ${SAFE_ERROR_MESSAGES.DUPLICATE_TWEET}`,
       };
     }
 
@@ -165,8 +257,9 @@ export class TradeCoordinator implements DurableObject {
       const maxMonPerDayWei = parseEther(env.MAX_MON_PER_DAY ?? "30");
       const requestedWei = parseEther(parsed.command.amountMon);
 
+      let limits = coordinatorState.limits;
       const limitCheck = checkTradeLimits({
-        state: coordinatorState.limits,
+        state: limits,
         requestedAmountWei: requestedWei,
         maxMonPerTradeWei,
         maxMonPerDayWei,
@@ -199,15 +292,7 @@ export class TradeCoordinator implements DurableObject {
         };
       }
 
-      if (isDuplicateTrade(existing)) {
-        return {
-          ok: false,
-          failureCode: "DUPLICATE_TWEET",
-          replyText: `trade rejected\n\nreason: ${SAFE_ERROR_MESSAGES.DUPLICATE_TWEET}`,
-        };
-      }
-
-      const result = await tradeService.executeDryRun({
+      const result = await tradeService.executeTrade({
         tweetId: input.tweetId,
         authorId: input.authorId,
         commandText: input.text,
@@ -216,17 +301,50 @@ export class TradeCoordinator implements DurableObject {
         existingRecord: existing,
       });
 
+      const nowMs = Date.now();
+      if (result.reservedAmountWei) {
+        limits = reserveSpend(limits, result.reservedAmountWei, nowMs);
+      }
+
+      if (result.committedAmountWei) {
+        limits = commitReservation(limits, result.committedAmountWei, nowMs);
+      } else if (result.releaseReservation && result.reservedAmountWei) {
+        limits = releaseReservation(limits, result.reservedAmountWei);
+      } else if (result.record.status === "DRY_RUN_SUCCESS") {
+        limits = recordHourlyTrade(limits, nowMs);
+      }
+
+      await this.saveCoordinatorState({
+        ...(await this.getCoordinatorState()),
+        limits,
+        processingLock: false,
+      });
+
       await this.saveTradeRecord(result.record);
 
+      if (result.record.status === "SUBMITTED" || result.record.status === "UNKNOWN") {
+        await this.addPendingSubmitted(result.record.tweetId);
+      }
+
+      logInfo("trade_processed", {
+        tweetId: result.record.tweetId,
+        status: result.record.status,
+        tokenAddress: result.record.tokenAddress,
+        requestedAmount: result.record.requestedAmountMon,
+        txHash: result.record.txHash,
+      });
+
       return {
-        ok: true,
+        ok: result.record.status === "DRY_RUN_SUCCESS" || result.record.status === "SUBMITTED",
         replyText: result.replyText,
         status: result.record.status,
+        failureCode: result.record.failureCode as TradeErrorCode | undefined,
       };
     } catch (error) {
       const failureCode = toFailureCode(error);
       const reason = toSafePublicReason(error);
 
+      const providers = createProviders(env);
       const record = createTradeRecord({
         tweetId: input.tweetId,
         authorId: input.authorId,
@@ -234,17 +352,22 @@ export class TradeCoordinator implements DurableObject {
         requestedAmountMon: parsed.command.amountMon,
         requestedAmountWei: parseEther(parsed.command.amountMon).toString(),
         tokenAddress: parsed.command.tokenAddress,
-        walletAddress: createProviders(env).walletAddress,
+        walletAddress: providers.walletAddress,
       });
 
       const failed = new TradeService(
         env,
-        createProviders(env).quoteProvider,
-        createProviders(env).simulationProvider,
-        createProviders(env).walletAddress,
+        providers.quoteProvider,
+        providers.simulationProvider,
+        providers.walletAddress,
       ).buildFailedResult(record, reason, failureCode);
 
       await this.saveTradeRecord(failed.record);
+
+      logWarn("trade_failed", {
+        tweetId: input.tweetId,
+        failureCode,
+      });
 
       return {
         ok: false,
@@ -254,8 +377,91 @@ export class TradeCoordinator implements DurableObject {
       };
     } finally {
       const latest = await this.getCoordinatorState();
-      await this.saveCoordinatorState({ ...latest, processingLock: false });
+      if (latest.processingLock) {
+        await this.saveCoordinatorState({ ...latest, processingLock: false });
+      }
     }
+  }
+
+  async confirmPendingTrades(): Promise<{
+    checked: number;
+    confirmed: number;
+    reverted: number;
+    replies: Array<{ tweetId: string; replyText: string; status: TradeRecord["status"] }>;
+  }> {
+    const pending = await this.getPendingSubmitted();
+    const replies: Array<{ tweetId: string; replyText: string; status: TradeRecord["status"] }> =
+      [];
+    let confirmed = 0;
+    let reverted = 0;
+
+    if (pending.length === 0 || !this.env.MONAD_RPC_URL) {
+      return { checked: 0, confirmed: 0, reverted: 0, replies };
+    }
+
+    const publicClient = createPublicBlockchainClient(this.env);
+
+    for (const tweetId of pending) {
+      const record = await this.getTradeRecord(tweetId);
+      if (!record?.txHash) {
+        await this.removePendingSubmitted(tweetId);
+        continue;
+      }
+
+      if (record.status !== "SUBMITTED" && record.status !== "UNKNOWN") {
+        await this.removePendingSubmitted(tweetId);
+        continue;
+      }
+
+      const receipt = await getTransactionReceipt(publicClient, record.txHash as `0x${string}`);
+
+      if (!receipt) {
+        continue;
+      }
+
+      if (receipt.status === "success") {
+        const updated = updateTradeRecord(record, {
+          status: "CONFIRMED",
+          blockNumber: receipt.blockNumber.toString(),
+        });
+        await this.saveTradeRecord(updated);
+        await this.removePendingSubmitted(tweetId);
+        confirmed += 1;
+
+        if (updated.lastReplyStatus !== "CONFIRMED") {
+          replies.push({
+            tweetId,
+            replyText: buildTradeReply(updated, "confirmed", this.env.MONAD_EXPLORER_TX_URL),
+            status: "CONFIRMED",
+          });
+        }
+      } else {
+        const updated = updateTradeRecord(record, {
+          status: "FAILED",
+          failureCode: "TRANSACTION_REVERTED",
+          failureMessageSafe: SAFE_ERROR_MESSAGES.TRANSACTION_REVERTED,
+          blockNumber: receipt.blockNumber.toString(),
+        });
+        await this.saveTradeRecord(updated);
+        await this.removePendingSubmitted(tweetId);
+        reverted += 1;
+
+        if (updated.lastReplyStatus !== "FAILED") {
+          replies.push({
+            tweetId,
+            replyText: buildTradeReply(updated, "failed", this.env.MONAD_EXPLORER_TX_URL),
+            status: "FAILED",
+          });
+        }
+      }
+    }
+
+    return {
+      checked: pending.length,
+      confirmed,
+      reverted,
+      replies,
+    };
   }
 }
 

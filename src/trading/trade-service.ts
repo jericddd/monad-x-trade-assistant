@@ -1,17 +1,26 @@
+import { parseEther } from "viem";
 import type { ParsedBuyCommand } from "../commands/types.js";
 import { validateBuyCommand } from "../commands/validate-buy-command.js";
 import type { AppEnv } from "../env.js";
 import { calculateMinimumAmountOut } from "../utils/bigint.js";
 import { isAllowlistedRouter } from "../utils/address.js";
-import { createTradeError } from "./errors.js";
+import { createTradeError, TradeError } from "./errors.js";
 import type { QuoteProvider, SimulationProvider } from "../blockchain/nadfun/quote.js";
+import { createLiveExecutionContext } from "../blockchain/nadfun/quote.js";
 import { createTradeRecord, updateTradeRecord, type TradeRecord } from "./trade-record.js";
 import { buildTradeReply, type ReplyKind } from "./replies.js";
+import { getNativeBalance, hasSufficientReserve } from "../blockchain/balances.js";
+import { estimateBuyGas } from "../blockchain/gas.js";
+import { buildBuyTransaction } from "../blockchain/nadfun/build-buy.js";
+import { executeNadfunBuy } from "../blockchain/wallet.js";
 
 export type TradeExecutionResult = {
   record: TradeRecord;
   replyKind: ReplyKind;
   replyText: string;
+  reservedAmountWei?: bigint;
+  committedAmountWei?: bigint;
+  releaseReservation?: boolean;
 };
 
 export class TradeService {
@@ -22,7 +31,7 @@ export class TradeService {
     private readonly walletAddress: `0x${string}`,
   ) {}
 
-  async executeDryRun(input: {
+  async executeTrade(input: {
     tweetId: string;
     authorId: string;
     commandText: string;
@@ -30,7 +39,11 @@ export class TradeService {
     command: ParsedBuyCommand;
     existingRecord?: TradeRecord | null;
   }): Promise<TradeExecutionResult> {
-    if (this.env.TRADING_ENABLED === false && this.env.TRADE_DRY_RUN !== true) {
+    const dryRun = this.env.TRADE_DRY_RUN !== false;
+    const tradingEnabled = this.env.TRADING_ENABLED === true;
+
+    // Dry-run overrides live trading.
+    if (!dryRun && !tradingEnabled) {
       throw createTradeError("TRADING_DISABLED");
     }
 
@@ -76,7 +89,14 @@ export class TradeService {
     }
 
     const slippageBps = this.env.DEFAULT_SLIPPAGE_BPS ?? 300;
+    if (slippageBps < 0 || slippageBps > 1000) {
+      throw createTradeError("SLIPPAGE_INVALID");
+    }
+
     const minimumAmountOut = calculateMinimumAmountOut(quote.expectedAmountOut, slippageBps);
+    const deadline = BigInt(
+      Math.floor(Date.now() / 1000) + (this.env.TRADE_DEADLINE_SECONDS ?? 120),
+    );
 
     record = updateTradeRecord(record, {
       status: "QUOTED",
@@ -94,28 +114,174 @@ export class TradeService {
       amountOutMin: minimumAmountOut,
       routerAddress: quote.routerAddress,
       recipient: this.walletAddress,
-      deadline: BigInt(Math.floor(Date.now() / 1000) + (this.env.TRADE_DEADLINE_SECONDS ?? 120)),
+      deadline,
     });
 
     if (!simulation.ok) {
       throw createTradeError("SIMULATION_FAILED", simulation.reason);
     }
 
-    const dryRun = this.env.TRADE_DRY_RUN !== false;
     if (dryRun) {
       record = updateTradeRecord(record, { status: "DRY_RUN_SUCCESS" });
       return {
         record,
         replyKind: "dry_run",
-        replyText: buildTradeReply(record, "dry_run"),
+        replyText: buildTradeReply(record, "dry_run", this.env.MONAD_EXPLORER_TX_URL),
       };
     }
 
-    if (this.env.TRADING_ENABLED !== true) {
+    return this.executeLiveBuy({
+      record,
+      tokenAddress: input.command.tokenAddress,
+      amountInWei: validation.amountWei,
+      amountOutMin: minimumAmountOut,
+      routerAddress: quote.routerAddress,
+      deadline,
+      allowedRouters,
+    });
+  }
+
+  private async executeLiveBuy(input: {
+    record: TradeRecord;
+    tokenAddress: `0x${string}`;
+    amountInWei: bigint;
+    amountOutMin: bigint;
+    routerAddress: `0x${string}`;
+    deadline: bigint;
+    allowedRouters: `0x${string}`[];
+  }): Promise<TradeExecutionResult> {
+    // Re-check emergency stop immediately before signing.
+    if (this.env.TRADING_ENABLED !== true || this.env.TRADE_DRY_RUN !== false) {
       throw createTradeError("TRADING_DISABLED");
     }
 
-    throw createTradeError("DRY_RUN_ENABLED");
+    if (!this.env.TRADE_WALLET_PRIVATE_KEY) {
+      throw createTradeError("CONFIGURATION_ERROR", "trade wallet private key is required");
+    }
+
+    const live = await createLiveExecutionContext(this.env);
+    if (!live.walletClient) {
+      throw createTradeError("CONFIGURATION_ERROR", "wallet client unavailable");
+    }
+
+    const data = buildBuyTransaction({
+      tokenAddress: input.tokenAddress,
+      amountOutMin: input.amountOutMin,
+      recipient: live.walletAddress,
+      deadline: input.deadline,
+    });
+
+    let gasEstimate: { gas: bigint; gasPrice: bigint; estimatedCost: bigint };
+    try {
+      gasEstimate = await estimateBuyGas({
+        publicClient: live.publicClient,
+        account: live.walletAddress,
+        to: input.routerAddress,
+        data,
+        value: input.amountInWei,
+      });
+    } catch {
+      throw createTradeError("GAS_ESTIMATION_FAILED");
+    }
+
+    const balance = await getNativeBalance(live.publicClient, live.walletAddress);
+    if (
+      !hasSufficientReserve({
+        walletBalance: balance,
+        tradeAmount: input.amountInWei,
+        estimatedGasCost: gasEstimate.estimatedCost,
+        minimumReserve: live.minReserveWei,
+      })
+    ) {
+      if (balance < input.amountInWei + gasEstimate.estimatedCost) {
+        throw createTradeError("INSUFFICIENT_WALLET_BALANCE");
+      }
+      throw createTradeError("MINIMUM_RESERVE_VIOLATION");
+    }
+
+    // Final emergency-stop check before broadcast.
+    if (this.env.TRADING_ENABLED !== true || this.env.TRADE_DRY_RUN !== false) {
+      throw createTradeError("TRADING_DISABLED");
+    }
+
+    let record = updateTradeRecord(input.record, {
+      status: "SUBMITTING",
+      reservedAmountWei: input.amountInWei.toString(),
+      walletAddress: live.walletAddress,
+    });
+
+    try {
+      const txHash = await executeNadfunBuy({
+        publicClient: live.publicClient,
+        walletClient: live.walletClient,
+        walletAddress: live.walletAddress,
+        tokenAddress: input.tokenAddress,
+        amountInWei: input.amountInWei,
+        amountOutMin: input.amountOutMin,
+        routerAddress: input.routerAddress,
+        deadline: input.deadline,
+        allowedRouters: input.allowedRouters,
+        gas: gasEstimate.gas,
+        gasPrice: gasEstimate.gasPrice,
+      });
+
+      record = updateTradeRecord(record, {
+        status: "SUBMITTED",
+        txHash,
+      });
+
+      return {
+        record,
+        replyKind: "submitted",
+        replyText: buildTradeReply(record, "submitted", this.env.MONAD_EXPLORER_TX_URL),
+        reservedAmountWei: input.amountInWei,
+        committedAmountWei: input.amountInWei,
+      };
+    } catch (error) {
+      if (error instanceof TradeError && error.code === "SUBMISSION_UNKNOWN") {
+        record = updateTradeRecord(record, {
+          status: "UNKNOWN",
+          failureCode: "SUBMISSION_UNKNOWN",
+          failureMessageSafe: error.safeMessage,
+        });
+        return {
+          record,
+          replyKind: "unknown",
+          replyText: buildTradeReply(record, "unknown", this.env.MONAD_EXPLORER_TX_URL),
+          reservedAmountWei: input.amountInWei,
+          committedAmountWei: input.amountInWei,
+        };
+      }
+
+      const reason =
+        error instanceof TradeError ? error.safeMessage : "transaction submission failed";
+      const code = error instanceof TradeError ? error.code : "SUBMISSION_FAILED";
+      record = updateTradeRecord(record, {
+        status: "FAILED",
+        failureCode: code,
+        failureMessageSafe: reason,
+      });
+
+      return {
+        record,
+        replyKind: "failed",
+        replyText: buildTradeReply(record, "failed", this.env.MONAD_EXPLORER_TX_URL),
+        reservedAmountWei: input.amountInWei,
+        releaseReservation: true,
+      };
+    }
+  }
+
+  /** @deprecated Use executeTrade — kept for existing dry-run tests */
+  async executeDryRun(input: {
+    tweetId: string;
+    authorId: string;
+    commandText: string;
+    commandTextHash: string;
+    command: ParsedBuyCommand;
+    existingRecord?: TradeRecord | null;
+  }): Promise<TradeExecutionResult> {
+    return this.executeTrade(input);
   }
 
   buildRejectedResult(record: TradeRecord, reason: string): TradeExecutionResult {
@@ -144,4 +310,8 @@ export class TradeService {
       replyText: buildTradeReply(updated, "failed"),
     };
   }
+}
+
+export function parseAmountWei(amountMon: string): bigint {
+  return parseEther(amountMon);
 }
