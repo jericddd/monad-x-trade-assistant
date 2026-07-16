@@ -6,7 +6,7 @@ const TOKEN = "0x978Ae7298D48Cf0f8d1fdB26abC12bfACFcC7777";
 
 describe("parseBuyCommand", () => {
   it("accepts standard buy command", () => {
-    const result = parseBuyCommand(`@monexmonad buy 100 mon of ${TOKEN}`, BOT);
+    const result = parseBuyCommand(`@monexmonad buy 100 mon ${TOKEN}`, BOT);
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.command.amountMon).toBe("100");
@@ -15,58 +15,110 @@ describe("parseBuyCommand", () => {
   });
 
   it("accepts no space between amount and mon", () => {
-    const result = parseBuyCommand(`@monexmonad buy 100mon of ${TOKEN}`, BOT);
+    const result = parseBuyCommand(`@monexmonad buy 100mon ${TOKEN}`, BOT);
     expect(result.ok).toBe(true);
   });
 
   it("accepts case-insensitive keywords", () => {
-    const result = parseBuyCommand(`@monexmonad BUY 0.5 MON OF ${TOKEN}`, BOT);
+    const result = parseBuyCommand(`@monexmonad BUY 0.5 MON ${TOKEN}`, BOT);
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.command.amountMon).toBe("0.5");
     }
   });
 
+  it("accepts newline between mon and token address", () => {
+    const result = parseBuyCommand(`@monexmonad buy 1 mon\n${TOKEN}`, BOT);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.command.amountMon).toBe("1");
+      expect(result.command.tokenAddress).toBe(TOKEN);
+    }
+  });
+
+  it("accepts newline after mention when X wraps the tweet", () => {
+    const result = parseBuyCommand(`@monexmonad\nbuy 1 mon ${TOKEN}`, BOT);
+    expect(result.ok).toBe(true);
+  });
+
+  it("accepts double @monexmonad when replying inside a MonExMonad thread", () => {
+    const result = parseBuyCommand(`@monexmonad @monexmonad buy 1 mon ${TOKEN}`, BOT);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.command.amountMon).toBe("1");
+      expect(result.command.tokenAddress).toBe(TOKEN);
+    }
+  });
+
+  it("accepts buy command without mention when already replying to the bot", () => {
+    const result = parseBuyCommand(`buy 1 mon ${TOKEN}`, BOT);
+    expect(result.ok).toBe(true);
+  });
+
+  it("accepts multi-mention reply chains (sub-reply of a reply)", () => {
+    const result = parseBuyCommand(`@monexmonad @jericddd @alice buy 1 mon ${TOKEN}`, BOT);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.command.amountMon).toBe("1");
+      expect(result.command.tokenAddress).toBe(TOKEN);
+    }
+  });
+
+  it("accepts mentions in mixed order before buy", () => {
+    const result = parseBuyCommand(`@alice @MonExMonad @bob buy 1mon ${TOKEN}`, BOT);
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects non-mention leading text even with bot tag", () => {
+    const result = parseBuyCommand(`please @monexmonad buy 1 mon ${TOKEN}`, BOT);
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects old format with of", () => {
+    const result = parseBuyCommand(`@monexmonad buy 100 mon of ${TOKEN}`, BOT);
+    expect(result.ok).toBe(false);
+  });
+
   it("rejects buy all mon", () => {
-    const result = parseBuyCommand(`@monexmonad buy all mon of ${TOKEN}`, BOT);
+    const result = parseBuyCommand(`@monexmonad buy all mon ${TOKEN}`, BOT);
     expect(result.ok).toBe(false);
   });
 
   it("rejects negative amount", () => {
-    const result = parseBuyCommand(`@monexmonad buy -10 mon of ${TOKEN}`, BOT);
+    const result = parseBuyCommand(`@monexmonad buy -10 mon ${TOKEN}`, BOT);
     expect(result.ok).toBe(false);
   });
 
   it("rejects zero amount", () => {
-    const result = parseBuyCommand(`@monexmonad buy 0 mon of ${TOKEN}`, BOT);
+    const result = parseBuyCommand(`@monexmonad buy 0 mon ${TOKEN}`, BOT);
     expect(result.ok).toBe(false);
   });
 
   it("rejects usd denomination", () => {
-    const result = parseBuyCommand(`@monexmonad buy 10 usd of ${TOKEN}`, BOT);
+    const result = parseBuyCommand(`@monexmonad buy 10 usd ${TOKEN}`, BOT);
     expect(result.ok).toBe(false);
   });
 
   it("rejects invalid token address", () => {
-    const result = parseBuyCommand("@monexmonad buy 10 mon of invalid", BOT);
+    const result = parseBuyCommand("@monexmonad buy 10 mon invalid", BOT);
     expect(result.ok).toBe(false);
   });
 
   it("rejects zero address", () => {
     const result = parseBuyCommand(
-      "@monexmonad buy 10 mon of 0x0000000000000000000000000000000000000000",
+      "@monexmonad buy 10 mon 0x0000000000000000000000000000000000000000",
       BOT,
     );
     expect(result.ok).toBe(false);
   });
 
   it("rejects extra instructions after contract", () => {
-    const result = parseBuyCommand(`@monexmonad buy 10 mon of ${TOKEN} then sell`, BOT);
+    const result = parseBuyCommand(`@monexmonad buy 10 mon ${TOKEN} then sell`, BOT);
     expect(result.ok).toBe(false);
   });
 
   it("rejects sell commands", () => {
-    const result = parseBuyCommand(`@monexmonad sell 10 mon of ${TOKEN}`, BOT);
+    const result = parseBuyCommand(`@monexmonad sell 10 mon ${TOKEN}`, BOT);
     expect(result.ok).toBe(false);
   });
 });

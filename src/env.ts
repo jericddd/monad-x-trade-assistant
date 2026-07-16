@@ -24,12 +24,12 @@ const privateKeySchema = z
 
 export const envSchema = z
   .object({
-    X_BEARER_TOKEN: z.string().min(1),
+    // Optional: MonEx-style OAuth 1.0a mentions do not need a Bearer token.
+    X_BEARER_TOKEN: z.string().min(1).optional(),
     X_API_KEY: z.string().min(1),
     X_API_SECRET: z.string().min(1),
     X_ACCESS_TOKEN: z.string().min(1),
     X_ACCESS_TOKEN_SECRET: z.string().min(1),
-    X_BOT_USER_ID: userIdSchema,
     X_BOT_USERNAME: z.string().min(1),
     AUTHORIZED_X_USER_ID: userIdSchema,
     MONAD_RPC_URL: z.string().url(),
@@ -156,7 +156,6 @@ export function parseEnvLenient(raw: Record<string, unknown>): Partial<AppEnv> {
       typeof defaults.X_BOT_USERNAME === "string" ? defaults.X_BOT_USERNAME : "monexmonad",
     AUTHORIZED_X_USER_ID:
       typeof defaults.AUTHORIZED_X_USER_ID === "string" ? defaults.AUTHORIZED_X_USER_ID : undefined,
-    X_BOT_USER_ID: typeof defaults.X_BOT_USER_ID === "string" ? defaults.X_BOT_USER_ID : undefined,
     NADFUN_LENS_ADDRESS:
       typeof defaults.NADFUN_LENS_ADDRESS === "string"
         ? (defaults.NADFUN_LENS_ADDRESS as `0x${string}`)

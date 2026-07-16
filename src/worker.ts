@@ -10,10 +10,15 @@ export interface Env extends AppEnv {
 }
 
 function toWorkerEnv(env: Env): AppEnv {
-  const parsed = parseEnvLenient(env as unknown as Record<string, unknown>);
+  const raw = env as unknown as Record<string, unknown>;
+  const parsed = parseEnvLenient(raw);
   return {
     ...parsed,
     TRADE_COORDINATOR: env.TRADE_COORDINATOR,
+    AUTHORIZED_X_USER_ID:
+      typeof raw.AUTHORIZED_X_USER_ID === "string"
+        ? raw.AUTHORIZED_X_USER_ID.trim()
+        : parsed.AUTHORIZED_X_USER_ID?.trim(),
   } as AppEnv;
 }
 

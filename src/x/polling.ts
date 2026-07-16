@@ -86,11 +86,15 @@ export async function pollMentions(env: AppEnv, client: XClient): Promise<PollRe
 
   try {
     const sinceId = (await getCursor(stub)) ?? undefined;
+    // Same as MonEx catch bot: bot id always comes from OAuth /users/me.
+    const botUser = await client.resolveBotUser();
 
-    const mentions = await client.fetchMentions({
-      sinceId,
-      botUserId: env.X_BOT_USER_ID,
+    logInfo("poll_bot_resolved", {
+      botUserId: botUser.id,
+      botUsername: botUser.username,
     });
+
+    const mentions = await client.fetchMentions({ sinceId });
 
     let processed = 0;
     let failed = 0;
@@ -119,8 +123,18 @@ export async function pollMentions(env: AppEnv, client: XClient): Promise<PollRe
 
         if (result.ok) {
           processed += 1;
-        } else if (result.failureCode !== "UNAUTHORIZED_AUTHOR") {
+        } else if (result.failureCode === "UNAUTHORIZED_AUTHOR") {
+          logInfo("mention_skipped_unauthorized", {
+            tweetId: tweet.id,
+            authorId: tweet.authorId,
+          });
+        } else {
           failed += 1;
+          logInfo("mention_rejected", {
+            tweetId: tweet.id,
+            authorId: tweet.authorId,
+            failureCode: result.failureCode,
+          });
         }
       } catch (error) {
         failed += 1;

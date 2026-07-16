@@ -27,7 +27,7 @@ describe("dry run", () => {
     const result = await service.executeDryRun({
       tweetId: "100",
       authorId: "123",
-      commandText: `@monexmonad buy 5 mon of ${TOKEN}`,
+      commandText: `@monexmonad buy 5 mon ${TOKEN}`,
       commandTextHash: "hash",
       command: {
         action: "buy",
@@ -53,7 +53,7 @@ describe("dry run", () => {
       service.executeDryRun({
         tweetId: "101",
         authorId: "123",
-        commandText: "@monexmonad buy 5 mon of 0x978ae7298d48cf0f8d1fdb26abc12bfacfcc0000",
+        commandText: "@monexmonad buy 5 mon 0x978ae7298d48cf0f8d1fdb26abc12bfacfcc0000",
         commandTextHash: "hash",
         command: {
           action: "buy",
@@ -76,7 +76,7 @@ describe("dry run", () => {
       service.executeDryRun({
         tweetId: "102",
         authorId: "123",
-        commandText: "@monexmonad buy 5 mon of 0x978ae7298d48cf0f8d1fdb26abc12bfacfccdead",
+        commandText: "@monexmonad buy 5 mon 0x978ae7298d48cf0f8d1fdb26abc12bfacfccdead",
         commandTextHash: "hash",
         command: {
           action: "buy",
@@ -99,7 +99,7 @@ describe("dry run", () => {
       service.executeDryRun({
         tweetId: "103",
         authorId: "123",
-        commandText: "@monexmonad buy 5 mon of 0x978ae7298d48cf0f8d1fdb26abc12bfacfccbad1",
+        commandText: "@monexmonad buy 5 mon 0x978ae7298d48cf0f8d1fdb26abc12bfacfccbad1",
         commandTextHash: "hash",
         command: {
           action: "buy",
@@ -121,7 +121,7 @@ describe("dry run", () => {
     const result = await service.executeDryRun({
       tweetId: "104",
       authorId: "123",
-      commandText: `@monexmonad buy 1 mon of ${TOKEN}`,
+      commandText: `@monexmonad buy 1 mon ${TOKEN}`,
       commandTextHash: "hash",
       command: {
         action: "buy",

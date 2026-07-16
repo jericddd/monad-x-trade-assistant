@@ -28,8 +28,8 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 ## Command format
 
 ```
-@monexmonad buy 100 mon of 0x978Ae7298D48Cf0f8d1fdB26abC12bfACFcC7777
-@monexmonad buy 100mon of 0x978Ae7298D48Cf0f8d1fdB26abC12bfACFcC7777
+@monexmonad buy 100 mon 0x978Ae7298D48Cf0f8d1fdB26abC12bfACFcC7777
+@monexmonad buy 100mon 0x978Ae7298D48Cf0f8d1fdB26abC12bfACFcC7777
 ```
 
 Spends exactly N native MON buying the token at the supplied contract.
@@ -87,6 +87,7 @@ npm run build
 
 ## Documentation
 
+- [docs/CREDENTIALS.md](docs/CREDENTIALS.md) — **which account each secret comes from**
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - [docs/SECURITY.md](docs/SECURITY.md)
 - [docs/RUNBOOK.md](docs/RUNBOOK.md)

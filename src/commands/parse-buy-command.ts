@@ -1,17 +1,27 @@
 import type { ParsedBuyCommand } from "./types.js";
 import { zeroAddress } from "viem";
 
-const BUY_COMMAND_PATTERN = /^buy\s+(\d+(?:\.\d+)?)\s*mon\s+of\s+(0x[a-fA-F0-9]{40})$/i;
+const BUY_COMMAND_PATTERN = /^buy\s+(\d+(?:\.\d+)?)\s*mon\s+(0x[a-fA-F0-9]{40})$/i;
 
 const MAX_DECIMALS = 18;
 
-function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function normalizeWhitespace(text: string): string {
+  return text
+    .replace(/[\r\n]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
-function stripBotMention(text: string, botUsername: string): string {
-  const mentionPattern = new RegExp(`@${escapeRegex(botUsername)}`, "gi");
-  return text.replace(mentionPattern, "").trim();
+/**
+ * X reply chains prepend one or more @handles (bot + other users).
+ * Strip every @mention so the remaining text can be matched as a buy command.
+ * Example: "@monexmonad @alice @bob buy 1 mon 0x..." → "buy 1 mon 0x..."
+ */
+function stripMentions(text: string): string {
+  return text
+    .replace(/@[\w_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function validateAmount(amount: string): string | null {
@@ -53,7 +63,9 @@ export type ParseBuyCommandResult =
   | { ok: false; reason: "INVALID_COMMAND" | "INVALID_AMOUNT" };
 
 export function parseBuyCommand(rawText: string, botUsername: string): ParseBuyCommandResult {
-  const normalized = stripBotMention(rawText, botUsername).trim();
+  void botUsername; // kept for call-site compatibility; all @mentions are stripped
+  // Strip all reply-chain mentions (bot + others), then require an exact buy command.
+  const normalized = stripMentions(normalizeWhitespace(rawText));
   const match = BUY_COMMAND_PATTERN.exec(normalized);
 
   if (!match) {

@@ -24,7 +24,7 @@ describe("live trading gates", () => {
     const result = await service.executeTrade({
       tweetId: "200",
       authorId: "123",
-      commandText: `@monexmonad buy 1 mon of ${TOKEN}`,
+      commandText: `@monexmonad buy 1 mon ${TOKEN}`,
       commandTextHash: "hash",
       command: { action: "buy", amountMon: "1", tokenAddress: TOKEN },
     });
@@ -52,7 +52,7 @@ describe("live trading gates", () => {
       service.executeTrade({
         tweetId: "201",
         authorId: "123",
-        commandText: `@monexmonad buy 1 mon of ${TOKEN}`,
+        commandText: `@monexmonad buy 1 mon ${TOKEN}`,
         commandTextHash: "hash",
         command: { action: "buy", amountMon: "1", tokenAddress: TOKEN },
       }),
@@ -83,7 +83,7 @@ describe("live trading gates", () => {
       service.executeTrade({
         tweetId: "202",
         authorId: "123",
-        commandText: `@monexmonad buy 1 mon of ${TOKEN}`,
+        commandText: `@monexmonad buy 1 mon ${TOKEN}`,
         commandTextHash: "hash",
         command: { action: "buy", amountMon: "1", tokenAddress: TOKEN },
       }),
