@@ -15,8 +15,8 @@ tag = "v1"
 new_sqlite_classes = ["TradeCoordinator"]
 
 [vars]
-TRADING_ENABLED = "true"
-TRADE_DRY_RUN = "false"
+TRADING_ENABLED = "false"
+TRADE_DRY_RUN = "true"
 MAX_MON_PER_TRADE = "10"
 MAX_MON_PER_DAY = "30"
 MAX_TRADES_PER_HOUR = "3"
