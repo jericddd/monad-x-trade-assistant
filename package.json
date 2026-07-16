@@ -18,7 +18,7 @@
     "tail": "wrangler tail"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "dependencies": {
     "viem": "^2.31.0",
