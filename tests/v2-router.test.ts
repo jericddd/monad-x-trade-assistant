@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { isV2Router, NADFUN_MAINNET, DEFAULT_ALLOWED_ROUTERS } from "../src/blockchain/nadfun/config.js";
+import {
+  isV2Router,
+  NADFUN_MAINNET,
+  DEFAULT_ALLOWED_ROUTERS,
+} from "../src/blockchain/nadfun/config.js";
 import { buildBuyTransaction } from "../src/blockchain/nadfun/build-buy.js";
 
 describe("nadfun v2 router support", () => {

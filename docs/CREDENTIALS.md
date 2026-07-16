@@ -12,12 +12,12 @@ The bot reads mentions and posts replies. These credentials must belong to the *
 
 Mentions use the same pattern as the working MonEx catch bot: **OAuth 1.0a**. Bot user id is always resolved via `/users/me` — there is no `X_BOT_USER_ID` setting.
 
-| Variable | Purpose |
-|----------|---------|
-| `X_API_KEY` | OAuth 1.0a consumer key |
-| `X_API_SECRET` | OAuth 1.0a consumer secret |
-| `X_ACCESS_TOKEN` | OAuth 1.0a access token for `@monexmonad` |
-| `X_ACCESS_TOKEN_SECRET` | OAuth 1.0a access token secret |
+| Variable                | Purpose                                   |
+| ----------------------- | ----------------------------------------- |
+| `X_API_KEY`             | OAuth 1.0a consumer key                   |
+| `X_API_SECRET`          | OAuth 1.0a consumer secret                |
+| `X_ACCESS_TOKEN`        | OAuth 1.0a access token for `@monexmonad` |
+| `X_ACCESS_TOKEN_SECRET` | OAuth 1.0a access token secret            |
 
 **Where to get them**
 
@@ -43,8 +43,8 @@ npx wrangler secret delete X_BOT_USER_ID
 
 Only this numeric X user ID may post buy commands. Everyone else is ignored.
 
-| Variable | Purpose |
-|----------|---------|
+| Variable               | Purpose                                   |
+| ---------------------- | ----------------------------------------- |
 | `AUTHORIZED_X_USER_ID` | Numeric user ID of the one allowed trader |
 
 **Where to get it**
@@ -56,8 +56,8 @@ Only this numeric X user ID may post buy commands. Everyone else is ignored.
 
 ## Monad
 
-| Variable | Purpose |
-|----------|---------|
+| Variable        | Purpose                             |
+| --------------- | ----------------------------------- |
 | `MONAD_RPC_URL` | HTTP RPC endpoint for Monad mainnet |
 
 **Where to get it**
@@ -74,8 +74,8 @@ Related non-secrets (in `wrangler.toml` / `.env.example`):
 
 ## Live trading only (optional)
 
-| Variable | Purpose |
-|----------|---------|
+| Variable                   | Purpose                                |
+| -------------------------- | -------------------------------------- |
 | `TRADE_WALLET_PRIVATE_KEY` | Dedicated hot wallet used to sign buys |
 
 **Not required for dry-run.** Create a **new wallet** used only for this bot. Never use your main wallet.

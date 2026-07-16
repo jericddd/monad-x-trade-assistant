@@ -56,10 +56,7 @@ describe("parseBuyCommand", () => {
   });
 
   it("accepts multi-mention reply chains (sub-reply of a reply)", () => {
-    const result = parseBuyCommand(
-      `@monexmonad @jericddd @alice buy 1 mon ${TOKEN}`,
-      BOT,
-    );
+    const result = parseBuyCommand(`@monexmonad @jericddd @alice buy 1 mon ${TOKEN}`, BOT);
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.command.amountMon).toBe("1");
