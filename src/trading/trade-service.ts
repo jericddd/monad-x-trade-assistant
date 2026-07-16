@@ -169,6 +169,7 @@ export class TradeService {
       amountOutMin: input.amountOutMin,
       recipient: live.walletAddress,
       deadline: input.deadline,
+      routerAddress: input.routerAddress,
     });
 
     let gasEstimate: { gas: bigint; gasPrice: bigint; estimatedCost: bigint };

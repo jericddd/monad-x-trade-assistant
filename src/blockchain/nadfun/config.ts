@@ -13,12 +13,19 @@ export const NADFUN_MAINNET = {
   BONDING_CURVE: "0xA7283d07812a02AFB7C09B60f8896bCEA3F90aCE" as const,
   WMON: "0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A" as const,
   DEX_FACTORY: "0x6B5F564339DbAD6b780249827f2198a841FEB7F3" as const,
+  /** NadFun V2 user-facing router (MONEX and other V2 tokens). */
+  V2_ROUTER: "0x8986C8fD44eb85294A725a7e61AF35E76bA26F91" as const,
 } as const;
 
 export const DEFAULT_ALLOWED_ROUTERS = [
   NADFUN_MAINNET.BONDING_CURVE_ROUTER,
   NADFUN_MAINNET.DEX_ROUTER,
+  NADFUN_MAINNET.V2_ROUTER,
 ] as const;
+
+export function isV2Router(address: string): boolean {
+  return address.toLowerCase() === NADFUN_MAINNET.V2_ROUTER.toLowerCase();
+}
 
 export type NadfunConfig = {
   lensAddress: `0x${string}`;

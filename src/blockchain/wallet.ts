@@ -32,6 +32,7 @@ export async function executeNadfunBuy(input: {
     amountOutMin: input.amountOutMin,
     recipient: input.walletAddress,
     deadline: input.deadline,
+    routerAddress: input.routerAddress,
   });
 
   try {
