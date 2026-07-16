@@ -13,6 +13,12 @@ export function healthResponse(env: Partial<AppEnv> & Record<string, unknown>): 
     typeof env.AUTHORIZED_X_USER_ID === "string" ? env.AUTHORIZED_X_USER_ID : undefined,
   );
 
+  const xOAuthConfigured =
+    hasSecret(env.X_API_KEY) &&
+    hasSecret(env.X_API_SECRET) &&
+    hasSecret(env.X_ACCESS_TOKEN) &&
+    hasSecret(env.X_ACCESS_TOKEN_SECRET);
+
   return Response.json({
     ok: true,
     service: "monad-x-trade-assistant",
@@ -20,13 +26,10 @@ export function healthResponse(env: Partial<AppEnv> & Record<string, unknown>): 
     dryRun: env.TRADE_DRY_RUN !== false,
     config: {
       botUserIdConfigured: Boolean(botUserId),
+      botUserIdResolvable: Boolean(botUserId) || xOAuthConfigured,
       authorizedUserIdConfigured: Boolean(authorizedUserId),
       xBearerTokenConfigured: hasSecret(env.X_BEARER_TOKEN),
-      xOAuthConfigured:
-        hasSecret(env.X_API_KEY) &&
-        hasSecret(env.X_API_SECRET) &&
-        hasSecret(env.X_ACCESS_TOKEN) &&
-        hasSecret(env.X_ACCESS_TOKEN_SECRET),
+      xOAuthConfigured,
     },
   });
 }

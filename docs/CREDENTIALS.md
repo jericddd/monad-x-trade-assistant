@@ -10,21 +10,29 @@ Secrets are set via Cloudflare (`wrangler secret put`) or locally in `.dev.vars`
 
 The bot reads mentions and posts replies. These credentials must belong to the **bot X account**.
 
+Mentions use the same pattern as the working MonEx catch bot: **OAuth 1.0a** (not Bearer / OAuth 2.0).
+
 | Variable | Purpose |
 |----------|---------|
-| `X_BEARER_TOKEN` | Read mentions via X API v2 |
-| `X_API_KEY` | OAuth 1.0a signing (app consumer key) |
-| `X_API_SECRET` | OAuth 1.0a signing (app consumer secret) |
-| `X_ACCESS_TOKEN` | Post replies as the bot |
-| `X_ACCESS_TOKEN_SECRET` | Post replies as the bot |
-| `X_BOT_USER_ID` | Numeric user ID of `@monexmonad` |
+| `X_API_KEY` | OAuth 1.0a consumer key |
+| `X_API_SECRET` | OAuth 1.0a consumer secret |
+| `X_ACCESS_TOKEN` | OAuth 1.0a access token for `@monexmonad` |
+| `X_ACCESS_TOKEN_SECRET` | OAuth 1.0a access token secret |
 
 **Where to get them**
 
 1. Create an app at [developer.x.com](https://developer.x.com) (Read + Write permissions).
-2. Generate **API Key**, **API Secret**, and **Bearer Token** from the app’s **Keys and tokens** page.
-3. Generate **Access Token** and **Access Token Secret** while authenticated as **@monexmonad** so replies come from the bot.
-4. Look up the bot’s numeric ID (e.g. [tweeterid.com](https://tweeterid.com)) for `X_BOT_USER_ID`.
+2. Enable **OAuth 1.0a** with Read + Write.
+3. Generate **Consumer Key / Secret** and **Access Token / Secret** while authenticated as **@monexmonad**.
+
+You can reuse the same four OAuth secrets already configured on the MonEx catch Worker (`monex-api`).
+
+Optional:
+
+| Variable | Purpose |
+|----------|---------|
+| `X_BOT_USER_ID` | Numeric bot ID (optional — auto-resolved via OAuth `/users/me`) |
+| `X_BEARER_TOKEN` | Not required for mentions (legacy / unused by poller) |
 
 Also set (non-secret, already in `wrangler.toml` by default):
 
@@ -78,13 +86,11 @@ Related non-secrets (in `wrangler.toml` / `.env.example`):
 ## Quick reference
 
 ```
-Bot (@monexmonad) — reads mentions, replies, runs the X app identity
-├── X_BEARER_TOKEN
+Bot (@monexmonad) — OAuth 1.0a (same as MonEx catch bot)
 ├── X_API_KEY
 ├── X_API_SECRET
 ├── X_ACCESS_TOKEN
-├── X_ACCESS_TOKEN_SECRET
-└── X_BOT_USER_ID
+└── X_ACCESS_TOKEN_SECRET
 
 Authorized account (you) — only account allowed to command buys
 └── AUTHORIZED_X_USER_ID
@@ -100,14 +106,14 @@ Monad — blockchain RPC
 After the first deploy:
 
 ```bash
-npx wrangler secret put X_BEARER_TOKEN
 npx wrangler secret put X_API_KEY
 npx wrangler secret put X_API_SECRET
 npx wrangler secret put X_ACCESS_TOKEN
 npx wrangler secret put X_ACCESS_TOKEN_SECRET
-npx wrangler secret put X_BOT_USER_ID
 npx wrangler secret put AUTHORIZED_X_USER_ID
 npx wrangler secret put MONAD_RPC_URL
+# optional:
+# npx wrangler secret put X_BOT_USER_ID
 npm run deploy
 ```
 

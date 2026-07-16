@@ -12,14 +12,13 @@ Set via `wrangler secret put` or GitHub environment secrets.
 
 **See [CREDENTIALS.md](./CREDENTIALS.md) for which account each secret comes from.**
 
-### Bot account (`@monexmonad`)
+### Bot account (`@monexmonad`) — OAuth 1.0a
 
-- `X_BEARER_TOKEN`
 - `X_API_KEY`
 - `X_API_SECRET`
 - `X_ACCESS_TOKEN`
 - `X_ACCESS_TOKEN_SECRET`
-- `X_BOT_USER_ID`
+- `X_BOT_USER_ID` (optional — auto-resolved via `/users/me`)
 
 ### Authorized account (you)
 

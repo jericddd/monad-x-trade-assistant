@@ -2,13 +2,13 @@
 # Never commit this file.
 # See docs/CREDENTIALS.md for which account each value comes from.
 
-# --- Bot account (@monexmonad) ---
-X_BEARER_TOKEN=
+# --- Bot account (@monexmonad) — OAuth 1.0a ---
 X_API_KEY=
 X_API_SECRET=
 X_ACCESS_TOKEN=
 X_ACCESS_TOKEN_SECRET=
-X_BOT_USER_ID=
+# Optional — auto-resolved via OAuth /users/me
+# X_BOT_USER_ID=
 X_BOT_USERNAME=monexmonad
 
 # --- Authorized account (only this user may trade) ---
