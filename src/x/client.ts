@@ -23,7 +23,7 @@ export type XBotUser = {
 
 export interface XClient {
   resolveBotUser(): Promise<XBotUser>;
-  fetchMentions(input: { sinceId?: string; botUserId?: string }): Promise<MentionsResponse>;
+  fetchMentions(input: { sinceId?: string }): Promise<MentionsResponse>;
   replyToTweet(input: { inReplyToTweetId: string; text: string }): Promise<{ id: string }>;
 }
 
@@ -32,8 +32,6 @@ export type XCredentials = {
   apiSecret: string;
   accessToken: string;
   accessTokenSecret: string;
-  /** Optional fallback if resolveBotUser fails or for offline config. */
-  botUserId?: string;
 };
 
 export class MockXClient implements XClient {
@@ -50,8 +48,7 @@ export class MockXClient implements XClient {
     return this.botUser;
   }
 
-  async fetchMentions(input: { sinceId?: string; botUserId?: string }): Promise<MentionsResponse> {
-    void input.botUserId;
+  async fetchMentions(input: { sinceId?: string }): Promise<MentionsResponse> {
     const filtered = input.sinceId
       ? this.mentions.filter((tweet) => BigInt(tweet.id) > BigInt(input.sinceId!))
       : [...this.mentions];
@@ -134,11 +131,6 @@ export class RealXClient implements XClient {
     });
 
     if (!response.ok) {
-      const fallbackId = normalizeOptionalNumericUserId(this.credentials.botUserId);
-      if (fallbackId) {
-        this.cachedBotUser = { id: fallbackId, username: "monexmonad" };
-        return this.cachedBotUser;
-      }
       const detail = await readXApiError(response);
       const suffix = detail ? `: ${detail}` : "";
       throw createTradeError("X_API_ERROR", `users/me request failed (${response.status})${suffix}`);
@@ -156,12 +148,11 @@ export class RealXClient implements XClient {
     return this.cachedBotUser;
   }
 
-  async fetchMentions(input: { sinceId?: string; botUserId?: string }): Promise<MentionsResponse> {
-    const botUserId =
-      normalizeOptionalNumericUserId(input.botUserId) ?? (await this.resolveBotUser()).id;
+  async fetchMentions(input: { sinceId?: string }): Promise<MentionsResponse> {
+    const botUser = await this.resolveBotUser();
     const sinceId = normalizeOptionalNumericUserId(input.sinceId);
 
-    const url = new URL(`${X_API_BASE}/users/${botUserId}/mentions`);
+    const url = new URL(`${X_API_BASE}/users/${botUser.id}/mentions`);
     url.searchParams.set("max_results", "100");
     url.searchParams.set("tweet.fields", "author_id,created_at,text");
     if (sinceId) {
@@ -253,9 +244,6 @@ export function createXClient(env: Record<string, unknown>): XClient {
   const apiSecret = env.X_API_SECRET;
   const accessToken = env.X_ACCESS_TOKEN;
   const accessTokenSecret = env.X_ACCESS_TOKEN_SECRET;
-  const botUserId = normalizeOptionalNumericUserId(
-    typeof env.X_BOT_USER_ID === "string" ? env.X_BOT_USER_ID : undefined,
-  );
 
   if (
     typeof apiKey !== "string" ||
@@ -275,6 +263,5 @@ export function createXClient(env: Record<string, unknown>): XClient {
     apiSecret: apiSecret.trim(),
     accessToken: accessToken.trim(),
     accessTokenSecret: accessTokenSecret.trim(),
-    botUserId,
   });
 }

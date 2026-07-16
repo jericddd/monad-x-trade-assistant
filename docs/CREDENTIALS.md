@@ -10,7 +10,7 @@ Secrets are set via Cloudflare (`wrangler secret put`) or locally in `.dev.vars`
 
 The bot reads mentions and posts replies. These credentials must belong to the **bot X account**.
 
-Mentions use the same pattern as the working MonEx catch bot: **OAuth 1.0a** (not Bearer / OAuth 2.0).
+Mentions use the same pattern as the working MonEx catch bot: **OAuth 1.0a**. Bot user id is always resolved via `/users/me` — there is no `X_BOT_USER_ID` setting.
 
 | Variable | Purpose |
 |----------|---------|
@@ -27,16 +27,15 @@ Mentions use the same pattern as the working MonEx catch bot: **OAuth 1.0a** (no
 
 You can reuse the same four OAuth secrets already configured on the MonEx catch Worker (`monex-api`).
 
-Optional:
-
-| Variable | Purpose |
-|----------|---------|
-| `X_BOT_USER_ID` | Numeric bot ID (optional — auto-resolved via OAuth `/users/me`) |
-| `X_BEARER_TOKEN` | Not required for mentions (legacy / unused by poller) |
-
 Also set (non-secret, already in `wrangler.toml` by default):
 
 - `X_BOT_USERNAME=monexmonad`
+
+If an old `X_BOT_USER_ID` secret still exists in Cloudflare, delete it:
+
+```bash
+npx wrangler secret delete X_BOT_USER_ID
+```
 
 ---
 
@@ -112,8 +111,8 @@ npx wrangler secret put X_ACCESS_TOKEN
 npx wrangler secret put X_ACCESS_TOKEN_SECRET
 npx wrangler secret put AUTHORIZED_X_USER_ID
 npx wrangler secret put MONAD_RPC_URL
-# optional:
-# npx wrangler secret put X_BOT_USER_ID
+# remove leftover secret if present:
+# npx wrangler secret delete X_BOT_USER_ID
 npm run deploy
 ```
 

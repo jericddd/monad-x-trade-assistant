@@ -6,9 +6,6 @@ function hasSecret(value: unknown): boolean {
 }
 
 export function healthResponse(env: Partial<AppEnv> & Record<string, unknown>): Response {
-  const botUserId = normalizeOptionalNumericUserId(
-    typeof env.X_BOT_USER_ID === "string" ? env.X_BOT_USER_ID : undefined,
-  );
   const authorizedUserId = normalizeOptionalNumericUserId(
     typeof env.AUTHORIZED_X_USER_ID === "string" ? env.AUTHORIZED_X_USER_ID : undefined,
   );
@@ -25,10 +22,8 @@ export function healthResponse(env: Partial<AppEnv> & Record<string, unknown>): 
     tradingEnabled: env.TRADING_ENABLED === true,
     dryRun: env.TRADE_DRY_RUN !== false,
     config: {
-      botUserIdConfigured: Boolean(botUserId),
-      botUserIdResolvable: Boolean(botUserId) || xOAuthConfigured,
       authorizedUserIdConfigured: Boolean(authorizedUserId),
-      xBearerTokenConfigured: hasSecret(env.X_BEARER_TOKEN),
+      botUserResolvedViaUsersMe: xOAuthConfigured,
       xOAuthConfigured,
     },
   });

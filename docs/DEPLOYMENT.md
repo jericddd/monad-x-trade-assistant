@@ -18,7 +18,8 @@ Set via `wrangler secret put` or GitHub environment secrets.
 - `X_API_SECRET`
 - `X_ACCESS_TOKEN`
 - `X_ACCESS_TOKEN_SECRET`
-- `X_BOT_USER_ID` (optional — auto-resolved via `/users/me`)
+
+Bot user id is resolved via OAuth `/users/me` (no `X_BOT_USER_ID`).
 
 ### Authorized account (you)
 

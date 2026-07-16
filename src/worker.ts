@@ -15,10 +15,6 @@ function toWorkerEnv(env: Env): AppEnv {
   return {
     ...parsed,
     TRADE_COORDINATOR: env.TRADE_COORDINATOR,
-    X_BOT_USER_ID:
-      typeof raw.X_BOT_USER_ID === "string"
-        ? raw.X_BOT_USER_ID.trim()
-        : parsed.X_BOT_USER_ID?.trim(),
     AUTHORIZED_X_USER_ID:
       typeof raw.AUTHORIZED_X_USER_ID === "string"
         ? raw.AUTHORIZED_X_USER_ID.trim()

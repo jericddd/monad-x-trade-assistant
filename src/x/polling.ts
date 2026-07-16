@@ -86,7 +86,7 @@ export async function pollMentions(env: AppEnv, client: XClient): Promise<PollRe
 
   try {
     const sinceId = (await getCursor(stub)) ?? undefined;
-    // Same as MonEx catch bot: resolve bot id from OAuth /users/me.
+    // Same as MonEx catch bot: bot id always comes from OAuth /users/me.
     const botUser = await client.resolveBotUser();
 
     logInfo("poll_bot_resolved", {
@@ -94,10 +94,7 @@ export async function pollMentions(env: AppEnv, client: XClient): Promise<PollRe
       botUsername: botUser.username,
     });
 
-    const mentions = await client.fetchMentions({
-      sinceId,
-      botUserId: botUser.id,
-    });
+    const mentions = await client.fetchMentions({ sinceId });
 
     let processed = 0;
     let failed = 0;
