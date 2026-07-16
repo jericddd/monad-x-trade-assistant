@@ -9,6 +9,10 @@ function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function normalizeWhitespace(text: string): string {
+  return text.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
 function stripBotMention(text: string, botUsername: string): string {
   const mentionPattern = new RegExp(`@${escapeRegex(botUsername)}`, "gi");
   return text.replace(mentionPattern, "").trim();
@@ -53,7 +57,7 @@ export type ParseBuyCommandResult =
   | { ok: false; reason: "INVALID_COMMAND" | "INVALID_AMOUNT" };
 
 export function parseBuyCommand(rawText: string, botUsername: string): ParseBuyCommandResult {
-  const normalized = stripBotMention(rawText, botUsername).trim();
+  const normalized = stripBotMention(normalizeWhitespace(rawText), botUsername).trim();
   const match = BUY_COMMAND_PATTERN.exec(normalized);
 
   if (!match) {

@@ -27,6 +27,15 @@ describe("parseBuyCommand", () => {
     }
   });
 
+  it("accepts newline between mon and token address", () => {
+    const result = parseBuyCommand(`@monexmonad buy 1 mon\n${TOKEN}`, BOT);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.command.amountMon).toBe("1");
+      expect(result.command.tokenAddress).toBe(TOKEN);
+    }
+  });
+
   it("rejects old format with of", () => {
     const result = parseBuyCommand(`@monexmonad buy 100 mon of ${TOKEN}`, BOT);
     expect(result.ok).toBe(false);
