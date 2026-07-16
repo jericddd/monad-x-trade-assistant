@@ -6,7 +6,10 @@ const BUY_COMMAND_PATTERN = /^buy\s+(\d+(?:\.\d+)?)\s*mon\s+(0x[a-fA-F0-9]{40})$
 const MAX_DECIMALS = 18;
 
 function normalizeWhitespace(text: string): string {
-  return text.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
+  return text
+    .replace(/[\r\n]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /**
@@ -15,7 +18,10 @@ function normalizeWhitespace(text: string): string {
  * Example: "@monexmonad @alice @bob buy 1 mon 0x..." → "buy 1 mon 0x..."
  */
 function stripMentions(text: string): string {
-  return text.replace(/@[\w_]+/g, " ").replace(/\s+/g, " ").trim();
+  return text
+    .replace(/@[\w_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function validateAmount(amount: string): string | null {

@@ -228,10 +228,7 @@ export function createProviders(env: Partial<AppEnv>): TradeProviders {
   };
 }
 
-export async function createLiveExecutionContext(
-  env: Partial<AppEnv>,
-  signerPrivateKey?: string,
-) {
+export async function createLiveExecutionContext(env: Partial<AppEnv>, signerPrivateKey?: string) {
   const clients = await createBlockchainClients(env, signerPrivateKey);
   const allowedRouters = (
     env.NADFUN_ALLOWED_ROUTER_ADDRESSES?.length

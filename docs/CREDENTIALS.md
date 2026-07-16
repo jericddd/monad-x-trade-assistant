@@ -12,12 +12,12 @@ The bot reads mentions and posts replies. These credentials must belong to the *
 
 Mentions use the same pattern as the working MonEx catch bot: **OAuth 1.0a**. Bot user id is always resolved via `/users/me` — there is no `X_BOT_USER_ID` setting.
 
-| Variable | Purpose |
-|----------|---------|
-| `X_API_KEY` | OAuth 1.0a consumer key |
-| `X_API_SECRET` | OAuth 1.0a consumer secret |
-| `X_ACCESS_TOKEN` | OAuth 1.0a access token for `@monexmonad` |
-| `X_ACCESS_TOKEN_SECRET` | OAuth 1.0a access token secret |
+| Variable                | Purpose                                   |
+| ----------------------- | ----------------------------------------- |
+| `X_API_KEY`             | OAuth 1.0a consumer key                   |
+| `X_API_SECRET`          | OAuth 1.0a consumer secret                |
+| `X_ACCESS_TOKEN`        | OAuth 1.0a access token for `@monexmonad` |
+| `X_ACCESS_TOKEN_SECRET` | OAuth 1.0a access token secret            |
 
 **Where to get them**
 
@@ -43,11 +43,11 @@ npx wrangler secret delete X_BOT_USER_ID
 
 Users who complete **Log in with X → Connect wallet** on `https://packs.monexmonad.xyz` are registered in the `USER_REGISTRY` Durable Object. Their **in-site trading wallet** (derived from `CUSTODIAL_MASTER_SEED`) is what signs buys when they mention `@monexmonad`.
 
-| Variable | Purpose |
-|----------|---------|
-| `AUTHORIZED_X_USER_ID` | Optional bootstrap allowlist (legacy single-user hot wallet) |
+| Variable                | Purpose                                                                             |
+| ----------------------- | ----------------------------------------------------------------------------------- |
+| `AUTHORIZED_X_USER_ID`  | Optional bootstrap allowlist (legacy single-user hot wallet)                        |
 | `CUSTODIAL_MASTER_SEED` | Master seed for per-user in-site wallets (falls back to `TRADE_WALLET_PRIVATE_KEY`) |
-| `SITE_API_SECRET` | Shared secret for packs.monexmonad.xyz link/withdraw APIs |
+| `SITE_API_SECRET`       | Shared secret for packs.monexmonad.xyz link/withdraw APIs                           |
 
 **Website**
 
@@ -59,8 +59,8 @@ Users who complete **Log in with X → Connect wallet** on `https://packs.monexm
 
 ## Monad
 
-| Variable | Purpose |
-|----------|---------|
+| Variable        | Purpose                             |
+| --------------- | ----------------------------------- |
 | `MONAD_RPC_URL` | HTTP RPC endpoint for Monad mainnet |
 
 **Where to get it**
@@ -77,8 +77,8 @@ Related non-secrets (in `wrangler.toml` / `.env.example`):
 
 ## Live trading only (optional)
 
-| Variable | Purpose |
-|----------|---------|
+| Variable                   | Purpose                                |
+| -------------------------- | -------------------------------------- |
 | `TRADE_WALLET_PRIVATE_KEY` | Dedicated hot wallet used to sign buys |
 
 **Not required for dry-run.** Create a **new wallet** used only for this bot. Never use your main wallet.

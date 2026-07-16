@@ -97,7 +97,10 @@ async function readXApiError(response: Response): Promise<string> {
     };
     return (
       errBody.detail ??
-      errBody.errors?.map((entry) => entry.detail ?? entry.message).filter(Boolean).join("; ") ??
+      errBody.errors
+        ?.map((entry) => entry.detail ?? entry.message)
+        .filter(Boolean)
+        .join("; ") ??
       errBody.title ??
       ""
     );
@@ -133,7 +136,10 @@ export class RealXClient implements XClient {
     if (!response.ok) {
       const detail = await readXApiError(response);
       const suffix = detail ? `: ${detail}` : "";
-      throw createTradeError("X_API_ERROR", `users/me request failed (${response.status})${suffix}`);
+      throw createTradeError(
+        "X_API_ERROR",
+        `users/me request failed (${response.status})${suffix}`,
+      );
     }
 
     const body = (await response.json()) as { data?: { id?: string; username?: string } };
@@ -177,7 +183,10 @@ export class RealXClient implements XClient {
     if (!response.ok) {
       const detail = await readXApiError(response);
       const suffix = detail ? `: ${detail}` : "";
-      throw createTradeError("X_API_ERROR", `mentions request failed (${response.status})${suffix}`);
+      throw createTradeError(
+        "X_API_ERROR",
+        `mentions request failed (${response.status})${suffix}`,
+      );
     }
 
     const body = (await response.json()) as MentionsApiResponse;

@@ -1,7 +1,4 @@
-export function normalizeNumericUserId(
-  value: string | undefined,
-  label: string,
-): string {
+export function normalizeNumericUserId(value: string | undefined, label: string): string {
   const trimmed = value?.trim();
   if (!trimmed) {
     throw new Error(`${label} is not configured`);

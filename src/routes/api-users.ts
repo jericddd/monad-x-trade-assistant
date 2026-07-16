@@ -68,7 +68,9 @@ export async function handleUsersApi(request: Request, env: Env): Promise<Respon
     let inSiteBalanceMon = "0";
     let connectedBalanceMon: string | null = null;
     try {
-      const publicClient = createPublicBlockchainClient(parseEnvLenient(env as unknown as Record<string, unknown>));
+      const publicClient = createPublicBlockchainClient(
+        parseEnvLenient(env as unknown as Record<string, unknown>),
+      );
       const inSiteBal = await getNativeBalance(publicClient, user.inSiteWallet);
       inSiteBalanceMon = formatEther(inSiteBal);
       const connectedBal = await getNativeBalance(publicClient, user.connectedWallet);
@@ -174,9 +176,6 @@ async function handleWithdraw(request: Request, env: Env): Promise<Response> {
   }
 }
 
-export async function getRegistryUser(
-  env: Env,
-  xUserId: string,
-): Promise<LinkedUserRecord | null> {
+export async function getRegistryUser(env: Env, xUserId: string): Promise<LinkedUserRecord | null> {
   return fetchLinkedUser(env, xUserId);
 }
