@@ -39,18 +39,21 @@ npx wrangler secret delete X_BOT_USER_ID
 
 ---
 
-## Authorized account (you)
+## Authorized accounts (multi-user)
 
-Only this numeric X user ID may post buy commands. Everyone else is ignored.
+Users who complete **Log in with X → Connect wallet** on `https://packs.monexmonad.xyz` are registered in the `USER_REGISTRY` Durable Object. Their **in-site trading wallet** (derived from `CUSTODIAL_MASTER_SEED`) is what signs buys when they mention `@monexmonad`.
 
-| Variable               | Purpose                                   |
-| ---------------------- | ----------------------------------------- |
-| `AUTHORIZED_X_USER_ID` | Numeric user ID of the one allowed trader |
+| Variable                | Purpose                                                                             |
+| ----------------------- | ----------------------------------------------------------------------------------- |
+| `AUTHORIZED_X_USER_ID`  | Optional bootstrap allowlist (legacy single-user hot wallet)                        |
+| `CUSTODIAL_MASTER_SEED` | Master seed for per-user in-site wallets (falls back to `TRADE_WALLET_PRIVATE_KEY`) |
+| `SITE_API_SECRET`       | Shared secret for packs.monexmonad.xyz link/withdraw APIs                           |
 
-**Where to get it**
+**Website**
 
-- Look up **your personal X account** numeric ID (the account that will post `@monexmonad buy ...` commands).
-- This is **not** the bot account ID.
+- Deposit: user wallet → in-site trading wallet (browser transfer)
+- Withdraw: in-site trading wallet → user wallet (Worker-signed)
+- Same `SITE_API_SECRET` must be set on the packs Worker as `TRADE_SITE_API_SECRET`
 
 ---
 

@@ -71,14 +71,18 @@ export function createWalletFromPrivateKey(
   };
 }
 
-export async function createBlockchainClients(env: Partial<AppEnv>): Promise<BlockchainClients> {
+export async function createBlockchainClients(
+  env: Partial<AppEnv>,
+  signerPrivateKey?: string,
+): Promise<BlockchainClients> {
   const publicClient = createPublicBlockchainClient(env);
   const expectedChainId = env.MONAD_CHAIN_ID ?? monad.id;
   await assertConfiguredChainId(publicClient, expectedChainId);
 
-  if (env.TRADE_WALLET_PRIVATE_KEY) {
+  const privateKey = signerPrivateKey ?? env.TRADE_WALLET_PRIVATE_KEY;
+  if (privateKey) {
     const { walletClient, walletAddress } = createWalletFromPrivateKey(
-      env.TRADE_WALLET_PRIVATE_KEY,
+      privateKey,
       env.MONAD_RPC_URL!,
       expectedChainId,
     );
