@@ -1,5 +1,5 @@
 import type { ParsedBuyCommand } from "../commands/types.js";
-import { isAuthorizedAuthor, parseBuyCommand } from "../commands/parse-buy-command.js";
+import { parseBuyCommand } from "../commands/parse-buy-command.js";
 import { parseEnvLenient, type AppEnv } from "../env.js";
 import { sha256Hex } from "../utils/hash.js";
 import { SAFE_ERROR_MESSAGES, type TradeErrorCode } from "../trading/errors.js";
@@ -27,6 +27,8 @@ import { createPublicBlockchainClient } from "../blockchain/client.js";
 import { getTransactionReceipt } from "../blockchain/receipts.js";
 import { parseEther } from "viem";
 import { logInfo, logWarn } from "../utils/logging.js";
+import type { LinkedUserRecord } from "../custodial/types.js";
+import { resolveSignerForAuthor } from "../custodial/resolve-signer.js";
 
 type CoordinatorState = {
   limits: LimitState;
@@ -53,8 +55,10 @@ const PENDING_INDEX_KEY = "pending:submitted";
 
 export class TradeCoordinator implements DurableObject {
   private readonly state: DurableObjectState;
-  private readonly env: Partial<AppEnv>;
-
+  private readonly env: Partial<AppEnv> & {
+    CUSTODIAL_MASTER_SEED?: string;
+    USER_REGISTRY?: DurableObjectNamespace;
+  };
   constructor(state: DurableObjectState, env: Record<string, unknown>) {
     this.state = state;
     this.env = parseEnvLenient(env);
@@ -81,9 +85,26 @@ export class TradeCoordinator implements DurableObject {
           : this.env.NADFUN_LENS_ADDRESS,
       TRADE_WALLET_PRIVATE_KEY:
         typeof env.TRADE_WALLET_PRIVATE_KEY === "string" ? env.TRADE_WALLET_PRIVATE_KEY : undefined,
+      CUSTODIAL_MASTER_SEED:
+        typeof env.CUSTODIAL_MASTER_SEED === "string" ? env.CUSTODIAL_MASTER_SEED : undefined,
+      USER_REGISTRY: env.USER_REGISTRY as DurableObjectNamespace | undefined,
       USE_MOCK_BLOCKCHAIN: env.USE_MOCK_BLOCKCHAIN === true || env.USE_MOCK_BLOCKCHAIN === "true",
       USE_MOCK_X: env.USE_MOCK_X === true || env.USE_MOCK_X === "true",
     };
+  }
+
+  private async lookupLinkedUser(xUserId: string): Promise<LinkedUserRecord | null> {
+    const registry = this.env.USER_REGISTRY;
+    if (!registry) return null;
+    try {
+      const stub = registry.get(registry.idFromName("primary"));
+      const res = await stub.fetch(`https://registry/get?xUserId=${encodeURIComponent(xUserId)}`);
+      if (!res.ok) return null;
+      const body = (await res.json()) as { user: LinkedUserRecord | null };
+      return body.user;
+    } catch {
+      return null;
+    }
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -207,9 +228,15 @@ export class TradeCoordinator implements DurableObject {
   async processMention(input: ProcessMentionRequest): Promise<ProcessMentionResponse> {
     const env = this.env;
     const botUsername = env.X_BOT_USERNAME ?? "monexmonad";
-    const authorizedUserId = env.AUTHORIZED_X_USER_ID ?? "";
 
-    if (!isAuthorizedAuthor(input.authorId, authorizedUserId)) {
+    const linkedUser = await this.lookupLinkedUser(input.authorId);
+    const signer = resolveSignerForAuthor({
+      env,
+      authorId: input.authorId,
+      user: linkedUser,
+    });
+
+    if (!signer) {
       return {
         ok: false,
         failureCode: "UNAUTHORIZED_AUTHOR",
@@ -255,7 +282,8 @@ export class TradeCoordinator implements DurableObject {
         env,
         providers.quoteProvider,
         providers.simulationProvider,
-        providers.walletAddress,
+        signer.walletAddress,
+        signer.privateKey,
       );
 
       const maxMonPerTradeWei = parseEther(env.MAX_MON_PER_TRADE ?? "10");
@@ -281,7 +309,7 @@ export class TradeCoordinator implements DurableObject {
             requestedAmountMon: parsed.command.amountMon,
             requestedAmountWei: requestedWei.toString(),
             tokenAddress: parsed.command.tokenAddress,
-            walletAddress: providers.walletAddress,
+            walletAddress: signer.walletAddress,
           });
 
         const rejected = tradeService.buildRejectedResult(
@@ -357,14 +385,15 @@ export class TradeCoordinator implements DurableObject {
         requestedAmountMon: parsed.command.amountMon,
         requestedAmountWei: parseEther(parsed.command.amountMon).toString(),
         tokenAddress: parsed.command.tokenAddress,
-        walletAddress: providers.walletAddress,
+        walletAddress: signer.walletAddress,
       });
 
       const failed = new TradeService(
         env,
         providers.quoteProvider,
         providers.simulationProvider,
-        providers.walletAddress,
+        signer.walletAddress,
+        signer.privateKey,
       ).buildFailedResult(record, reason, failureCode);
 
       await this.saveTradeRecord(failed.record);

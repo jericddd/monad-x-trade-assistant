@@ -10,9 +10,17 @@ crons = ["* * * * *"]
 name = "TRADE_COORDINATOR"
 class_name = "TradeCoordinator"
 
+[[durable_objects.bindings]]
+name = "USER_REGISTRY"
+class_name = "UserRegistry"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["TradeCoordinator"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["UserRegistry"]
 
 [vars]
 TRADING_ENABLED = "true"

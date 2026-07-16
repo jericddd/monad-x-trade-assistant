@@ -9,7 +9,7 @@ X_ACCESS_TOKEN=
 X_ACCESS_TOKEN_SECRET=
 X_BOT_USERNAME=monexmonad
 
-# --- Authorized account (only this user may trade) ---
+# --- Bootstrap authorized account (legacy; linked users use registry) ---
 AUTHORIZED_X_USER_ID=
 
 # --- Monad ---
@@ -18,6 +18,10 @@ MONAD_CHAIN_ID=143
 MONAD_EXPLORER_TX_URL=https://monadvision.com/tx/
 
 TRADE_WALLET_PRIVATE_KEY=
+# Optional master seed for per-user in-site wallets (defaults to TRADE_WALLET_PRIVATE_KEY)
+CUSTODIAL_MASTER_SEED=
+# Shared with packs.monexmonad.xyz for link/withdraw APIs
+SITE_API_SECRET=
 
 NADFUN_LENS_ADDRESS=0x7e78A8DE94f21804F7a17F4E8BF9EC2c872187ea
 NADFUN_ALLOWED_ROUTER_ADDRESSES=0x6F6B8F1a20703309951a5127c45B49b1CD981A22,0x0B79d71AE99528D1dB24A4148b5f4F865cc2b137,0x8986C8fD44eb85294A725a7e61AF35E76bA26F91

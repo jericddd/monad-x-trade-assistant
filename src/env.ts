@@ -31,11 +31,16 @@ export const envSchema = z
     X_ACCESS_TOKEN: z.string().min(1),
     X_ACCESS_TOKEN_SECRET: z.string().min(1),
     X_BOT_USERNAME: z.string().min(1),
-    AUTHORIZED_X_USER_ID: userIdSchema,
+    // Bootstrap allowlist (legacy single-user). Multi-user auth uses USER_REGISTRY.
+    AUTHORIZED_X_USER_ID: userIdSchema.optional(),
     MONAD_RPC_URL: z.string().url(),
     MONAD_CHAIN_ID: z.coerce.number().int().positive(),
     MONAD_EXPLORER_TX_URL: z.string().url(),
     TRADE_WALLET_PRIVATE_KEY: privateKeySchema,
+    /** Master seed for per-user in-site wallets. Falls back to TRADE_WALLET_PRIVATE_KEY. */
+    CUSTODIAL_MASTER_SEED: z.string().min(16).optional(),
+    /** Shared secret for packs.monexmonad.xyz → Worker link/withdraw APIs. */
+    SITE_API_SECRET: z.string().min(16).optional(),
     NADFUN_LENS_ADDRESS: addressSchema,
     NADFUN_ALLOWED_ROUTER_ADDRESSES: z
       .string()
@@ -61,13 +66,15 @@ export const envSchema = z
     USE_MOCK_BLOCKCHAIN: booleanFromString.optional(),
     USE_MOCK_X: booleanFromString.optional(),
     TRADE_COORDINATOR: z.custom<DurableObjectNamespace>().optional(),
+    USER_REGISTRY: z.custom<DurableObjectNamespace>().optional(),
   })
   .superRefine((env, ctx) => {
     if (env.TRADING_ENABLED && !env.TRADE_DRY_RUN) {
-      if (!env.TRADE_WALLET_PRIVATE_KEY) {
+      if (!env.TRADE_WALLET_PRIVATE_KEY && !env.CUSTODIAL_MASTER_SEED) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "TRADE_WALLET_PRIVATE_KEY is required when live trading is enabled",
+          message:
+            "TRADE_WALLET_PRIVATE_KEY or CUSTODIAL_MASTER_SEED is required when live trading is enabled",
           path: ["TRADE_WALLET_PRIVATE_KEY"],
         });
       }
@@ -165,8 +172,15 @@ export function parseEnvLenient(raw: Record<string, unknown>): Partial<AppEnv> {
       typeof defaults.TRADE_WALLET_PRIVATE_KEY === "string"
         ? defaults.TRADE_WALLET_PRIVATE_KEY
         : undefined,
+    CUSTODIAL_MASTER_SEED:
+      typeof defaults.CUSTODIAL_MASTER_SEED === "string"
+        ? defaults.CUSTODIAL_MASTER_SEED
+        : undefined,
+    SITE_API_SECRET:
+      typeof defaults.SITE_API_SECRET === "string" ? defaults.SITE_API_SECRET : undefined,
     USE_MOCK_BLOCKCHAIN: asBoolean(defaults.USE_MOCK_BLOCKCHAIN, false),
     USE_MOCK_X: asBoolean(defaults.USE_MOCK_X, false),
     TRADE_COORDINATOR: defaults.TRADE_COORDINATOR as DurableObjectNamespace | undefined,
+    USER_REGISTRY: defaults.USER_REGISTRY as DurableObjectNamespace | undefined,
   };
 }

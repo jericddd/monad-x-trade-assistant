@@ -29,6 +29,8 @@ export class TradeService {
     private readonly quoteProvider: QuoteProvider,
     private readonly simulationProvider: SimulationProvider,
     private readonly walletAddress: `0x${string}`,
+    /** When set, live buys/withdraw sign with this key (per-user in-site wallet). */
+    private readonly signerPrivateKey?: string,
   ) {}
 
   async executeTrade(input: {
@@ -155,11 +157,12 @@ export class TradeService {
       throw createTradeError("TRADING_DISABLED");
     }
 
-    if (!this.env.TRADE_WALLET_PRIVATE_KEY) {
+    const signerKey = this.signerPrivateKey ?? this.env.TRADE_WALLET_PRIVATE_KEY;
+    if (!signerKey) {
       throw createTradeError("CONFIGURATION_ERROR", "trade wallet private key is required");
     }
 
-    const live = await createLiveExecutionContext(this.env);
+    const live = await createLiveExecutionContext(this.env, signerKey);
     if (!live.walletClient) {
       throw createTradeError("CONFIGURATION_ERROR", "wallet client unavailable");
     }
