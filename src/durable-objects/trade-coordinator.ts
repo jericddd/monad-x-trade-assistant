@@ -69,13 +69,16 @@ export class TradeCoordinator implements DurableObject {
         typeof env.X_ACCESS_TOKEN_SECRET === "string" ? env.X_ACCESS_TOKEN_SECRET : undefined,
       AUTHORIZED_X_USER_ID:
         typeof env.AUTHORIZED_X_USER_ID === "string" ? env.AUTHORIZED_X_USER_ID : undefined,
-      MONAD_RPC_URL: typeof env.MONAD_RPC_URL === "string" ? env.MONAD_RPC_URL : undefined,
+      MONAD_RPC_URL:
+        typeof env.MONAD_RPC_URL === "string" && env.MONAD_RPC_URL.trim()
+          ? env.MONAD_RPC_URL.trim().replace(/^["']|["']$/g, "")
+          : this.env.MONAD_RPC_URL,
       MONAD_CHAIN_ID:
         env.MONAD_CHAIN_ID !== undefined ? Number(env.MONAD_CHAIN_ID) : this.env.MONAD_CHAIN_ID,
       NADFUN_LENS_ADDRESS:
         typeof env.NADFUN_LENS_ADDRESS === "string"
           ? (env.NADFUN_LENS_ADDRESS as `0x${string}`)
-          : undefined,
+          : this.env.NADFUN_LENS_ADDRESS,
       TRADE_WALLET_PRIVATE_KEY:
         typeof env.TRADE_WALLET_PRIVATE_KEY === "string" ? env.TRADE_WALLET_PRIVATE_KEY : undefined,
       USE_MOCK_BLOCKCHAIN: env.USE_MOCK_BLOCKCHAIN === true || env.USE_MOCK_BLOCKCHAIN === "true",
@@ -369,6 +372,8 @@ export class TradeCoordinator implements DurableObject {
       logWarn("trade_failed", {
         tweetId: input.tweetId,
         failureCode,
+        reason,
+        detail: error instanceof Error ? error.message : "unknown",
       });
 
       return {
