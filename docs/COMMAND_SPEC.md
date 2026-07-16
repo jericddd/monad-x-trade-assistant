@@ -11,7 +11,9 @@ buy <amount> mon <tokenContract>
 - `@monexmonad buy 100 mon 0x978Ae7298D48Cf0f8d1fdB26abC12bfACFcC7777`
 - `@monexmonad buy 100mon 0x978Ae7298D48Cf0f8d1fdB26abC12bfACFcC7777`
 - `@monexmonad BUY 0.5 MON 0x978Ae7298D48Cf0f8d1fdB26abC12bfACFcC7777`
-- Double bot mention is OK when replying in a `@monexmonad` thread (X often prepends another mention):
+- Reply-chain mentions are OK (X prepends every participant). All `@handles` are stripped before parsing:
+  `@monexmonad @alice @bob buy 1 mon 0x978Ae7298D48Cf0f8d1fdB26abC12bfACFcC7777`
+- Double bot mention is OK:
   `@monexmonad @monexmonad buy 1 mon 0x978Ae7298D48Cf0f8d1fdB26abC12bfACFcC7777`
 - Or just `buy 1 mon 0x...` when already replying to the bot
 - Line breaks are OK (X may wrap long tweets); newlines are normalized to spaces before parsing:

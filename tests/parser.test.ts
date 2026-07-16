@@ -55,6 +55,28 @@ describe("parseBuyCommand", () => {
     expect(result.ok).toBe(true);
   });
 
+  it("accepts multi-mention reply chains (sub-reply of a reply)", () => {
+    const result = parseBuyCommand(
+      `@monexmonad @jericddd @alice buy 1 mon ${TOKEN}`,
+      BOT,
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.command.amountMon).toBe("1");
+      expect(result.command.tokenAddress).toBe(TOKEN);
+    }
+  });
+
+  it("accepts mentions in mixed order before buy", () => {
+    const result = parseBuyCommand(`@alice @MonExMonad @bob buy 1mon ${TOKEN}`, BOT);
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects non-mention leading text even with bot tag", () => {
+    const result = parseBuyCommand(`please @monexmonad buy 1 mon ${TOKEN}`, BOT);
+    expect(result.ok).toBe(false);
+  });
+
   it("rejects old format with of", () => {
     const result = parseBuyCommand(`@monexmonad buy 100 mon of ${TOKEN}`, BOT);
     expect(result.ok).toBe(false);
