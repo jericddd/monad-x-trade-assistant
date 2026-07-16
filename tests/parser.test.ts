@@ -65,6 +65,17 @@ describe("parseBuyCommand", () => {
     expect(result.ok).toBe(false);
   });
 
+  it("accepts newline and extra mentions before buy command", () => {
+    const result = parseBuyCommand(
+      `@MonExMonad @monexmonad\nbuy 1 mon of ${TOKEN}`,
+      BOT,
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.command.amountMon).toBe("1");
+    }
+  });
+
   it("rejects sell commands", () => {
     const result = parseBuyCommand(`@monexmonad sell 10 mon of ${TOKEN}`, BOT);
     expect(result.ok).toBe(false);

@@ -67,6 +67,9 @@ export class TradeCoordinator implements DurableObject {
       X_ACCESS_TOKEN: typeof env.X_ACCESS_TOKEN === "string" ? env.X_ACCESS_TOKEN : undefined,
       X_ACCESS_TOKEN_SECRET:
         typeof env.X_ACCESS_TOKEN_SECRET === "string" ? env.X_ACCESS_TOKEN_SECRET : undefined,
+      X_BOT_USER_ID: typeof env.X_BOT_USER_ID === "string" ? env.X_BOT_USER_ID : undefined,
+      AUTHORIZED_X_USER_ID:
+        typeof env.AUTHORIZED_X_USER_ID === "string" ? env.AUTHORIZED_X_USER_ID : undefined,
       MONAD_RPC_URL: typeof env.MONAD_RPC_URL === "string" ? env.MONAD_RPC_URL : undefined,
       MONAD_CHAIN_ID:
         env.MONAD_CHAIN_ID !== undefined ? Number(env.MONAD_CHAIN_ID) : this.env.MONAD_CHAIN_ID,

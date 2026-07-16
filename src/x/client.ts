@@ -93,7 +93,7 @@ export class RealXClient implements XClient {
     });
 
     if (!response.ok) {
-      throw createTradeError("X_API_ERROR");
+      throw createTradeError("X_API_ERROR", `mentions request failed (${response.status})`);
     }
 
     const body = (await response.json()) as MentionsApiResponse;
