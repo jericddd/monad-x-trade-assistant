@@ -1,6 +1,7 @@
 import type { AppEnv } from "../env.js";
 import type { XClient } from "./client.js";
 import { processMentionReplies } from "./replies.js";
+import { normalizeNumericUserId } from "./user-id.js";
 import { logError, logInfo } from "../utils/logging.js";
 import type { ProcessMentionResponse } from "../durable-objects/trade-coordinator.js";
 
@@ -86,10 +87,11 @@ export async function pollMentions(env: AppEnv, client: XClient): Promise<PollRe
 
   try {
     const sinceId = (await getCursor(stub)) ?? undefined;
+    const botUserId = normalizeNumericUserId(env.X_BOT_USER_ID, "X_BOT_USER_ID");
 
     const mentions = await client.fetchMentions({
       sinceId,
-      botUserId: env.X_BOT_USER_ID,
+      botUserId,
     });
 
     let processed = 0;

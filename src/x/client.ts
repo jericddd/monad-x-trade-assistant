@@ -1,5 +1,6 @@
 import { buildOAuth1AuthorizationHeader } from "./oauth1.js";
 import { createTradeError } from "../trading/errors.js";
+import { normalizeNumericUserId, normalizeOptionalNumericUserId } from "./user-id.js";
 
 export type XTweet = {
   id: string;
@@ -79,21 +80,41 @@ export class RealXClient implements XClient {
   constructor(private readonly credentials: XCredentials) {}
 
   async fetchMentions(input: { sinceId?: string; botUserId: string }): Promise<MentionsResponse> {
-    const url = new URL(`https://api.x.com/2/users/${input.botUserId}/mentions`);
+    const botUserId = normalizeNumericUserId(input.botUserId, "X_BOT_USER_ID");
+    const sinceId = normalizeOptionalNumericUserId(input.sinceId);
+
+    const url = new URL(`https://api.x.com/2/users/${botUserId}/mentions`);
     url.searchParams.set("max_results", "100");
     url.searchParams.set("tweet.fields", "author_id,created_at,text");
-    if (input.sinceId) {
-      url.searchParams.set("since_id", input.sinceId);
+    if (sinceId) {
+      url.searchParams.set("since_id", sinceId);
     }
 
     const response = await fetch(url.toString(), {
       headers: {
-        Authorization: `Bearer ${this.credentials.bearerToken}`,
+        Authorization: `Bearer ${this.credentials.bearerToken.trim()}`,
       },
     });
 
     if (!response.ok) {
-      throw createTradeError("X_API_ERROR", `mentions request failed (${response.status})`);
+      let detail = "";
+      try {
+        const errBody = (await response.json()) as {
+          detail?: string;
+          title?: string;
+          errors?: Array<{ message?: string }>;
+        };
+        detail =
+          errBody.detail ??
+          errBody.errors?.map((entry) => entry.message).filter(Boolean).join("; ") ??
+          errBody.title ??
+          "";
+      } catch {
+        // ignore malformed error bodies
+      }
+
+      const suffix = detail ? `: ${detail}` : "";
+      throw createTradeError("X_API_ERROR", `mentions request failed (${response.status})${suffix}`);
     }
 
     const body = (await response.json()) as MentionsApiResponse;
@@ -178,10 +199,10 @@ export function createXClient(env: Record<string, unknown>): XClient {
   }
 
   return new RealXClient({
-    bearerToken,
-    apiKey,
-    apiSecret,
-    accessToken,
-    accessTokenSecret,
+    bearerToken: bearerToken.trim(),
+    apiKey: apiKey.trim(),
+    apiSecret: apiSecret.trim(),
+    accessToken: accessToken.trim(),
+    accessTokenSecret: accessTokenSecret.trim(),
   });
 }
