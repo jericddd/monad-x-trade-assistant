@@ -56,9 +56,8 @@ function tickerLabel(record: TradeRecord): string {
 }
 
 function tokenLine(record: TradeRecord): string {
-  const ticker = tickerLabel(record);
-  // Full CA + mandatory " / $TICKER"
-  return `token: ${record.tokenAddress} / $${ticker}`;
+  // Full CA only — ticker already appears on the received line.
+  return `token: ${record.tokenAddress}`;
 }
 
 /**
