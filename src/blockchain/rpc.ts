@@ -8,7 +8,9 @@ const DEFAULT_FALLBACK_RPCS = [
   "https://monad-mainnet.drpc.org",
 ] as const;
 
-export function resolveMonadRpcUrls(env: Partial<AppEnv> & { MONAD_RPC_FALLBACK_URLS?: string }): string[] {
+export function resolveMonadRpcUrls(
+  env: Partial<AppEnv> & { MONAD_RPC_FALLBACK_URLS?: string },
+): string[] {
   const primary = typeof env.MONAD_RPC_URL === "string" ? env.MONAD_RPC_URL.trim() : "";
   const fallbackRaw =
     typeof env.MONAD_RPC_FALLBACK_URLS === "string" && env.MONAD_RPC_FALLBACK_URLS.trim()

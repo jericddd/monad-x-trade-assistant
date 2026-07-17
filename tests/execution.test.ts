@@ -17,8 +17,7 @@ function mockWalletClient(overrides: {
   signTransaction?: ReturnType<typeof vi.fn>;
 }) {
   const signTransaction =
-    overrides.signTransaction ??
-    vi.fn().mockResolvedValue("0x02f8660101010101010101");
+    overrides.signTransaction ?? vi.fn().mockResolvedValue("0x02f8660101010101010101");
   return {
     account: {
       ...ACCOUNT,

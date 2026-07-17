@@ -35,10 +35,7 @@ function isAlreadyKnownError(message: string): boolean {
   return /already known|known transaction|nonce too low/i.test(message);
 }
 
-async function isTxVisible(
-  publicClient: PublicClient,
-  hash: Hex,
-): Promise<boolean> {
+async function isTxVisible(publicClient: PublicClient, hash: Hex): Promise<boolean> {
   try {
     const tx = await publicClient.getTransaction({ hash });
     return Boolean(tx);
@@ -94,8 +91,7 @@ export async function executeNadfunBuy(input: {
   });
 
   // Slight tip over estimate to improve inclusion under load.
-  const gasPrice =
-    input.gasPrice != null ? (input.gasPrice * 112n) / 100n : undefined;
+  const gasPrice = input.gasPrice != null ? (input.gasPrice * 112n) / 100n : undefined;
 
   let serialized: Hex;
   let hash: Hex;
@@ -197,11 +193,7 @@ export async function executeNadfunBuy(input: {
   }
 
   // Signed but never seen on any RPC — safe to retry with a new command.
-  throw createSubmissionError(
-    "SUBMISSION_FAILED",
-    "broadcast did not land — safe to retry",
-    hash,
-  );
+  throw createSubmissionError("SUBMISSION_FAILED", "broadcast did not land — safe to retry", hash);
 }
 
 export function getTradeWalletAddress(privateKey: string): `0x${string}` {
