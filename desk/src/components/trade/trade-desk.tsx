@@ -10,7 +10,7 @@ import {
   useWaitForTransactionReceipt,
   useSignMessage,
 } from "wagmi";
-import { parseEther } from "viem";
+import { createPublicClient, formatEther, http, parseEther } from "viem";
 import {
   AppWindow,
   ArrowDown,
@@ -35,6 +35,11 @@ import {
   getNadFunTokenUrl,
   monadMainnet,
 } from "@/lib/monad-chain";
+
+const publicBalanceClient = createPublicClient({
+  chain: monadMainnet,
+  transport: http(monadMainnet.rpcUrls.default.http[0]),
+});
 
 type TradeAccountPayload = {
   linked: boolean;
@@ -245,6 +250,8 @@ export function TradeDesk() {
   const [tradeAmount, setTradeAmount] = useState("1");
   const [sellPercent, setSellPercent] = useState(100);
   const [tradeBusy, setTradeBusy] = useState(false);
+  /** On-chain MON for the linked hot wallet — works even when browser wallet is disconnected. */
+  const [hotWalletMon, setHotWalletMon] = useState<string | null>(null);
   const pendingDepositRef = useRef<{ amountMon: string; txHash: `0x${string}` } | null>(null);
   const recordedDepositsRef = useRef<Set<string>>(new Set());
 
@@ -349,6 +356,43 @@ export function TradeDesk() {
   useEffect(() => {
     if (account?.linked) void refreshPortfolio(activityPage);
   }, [account?.linked, activityPage, refreshPortfolio]);
+
+  // Always read the linked browser-wallet balance from chain (not wagmi).
+  // After setup, users often disconnect — balance must still show for "Your wallet".
+  useEffect(() => {
+    const addr = account?.account?.connectedWallet;
+    if (!account?.linked || !addr) {
+      setHotWalletMon(null);
+      return;
+    }
+
+    let cancelled = false;
+    const refreshHotBalance = async () => {
+      try {
+        const bal = await publicBalanceClient.getBalance({
+          address: addr as `0x${string}`,
+        });
+        if (!cancelled) setHotWalletMon(formatEther(bal));
+      } catch {
+        // Fall back to API balance via yourBal below.
+      }
+    };
+
+    void refreshHotBalance();
+    const id = window.setInterval(refreshHotBalance, 5000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refreshHotBalance();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, [account?.linked, account?.account?.connectedWallet]);
 
   // Live updates for demo UX — poll quietly + refresh when tab is focused.
   useEffect(() => {
@@ -789,14 +833,15 @@ export function TradeDesk() {
 
   // ——— Phase 3: Desk (fully onboarded) ———
   const tradingBal = formatMon(account?.balances?.inSiteMon);
-  const yourBal = formatMon(account?.balances?.connectedMon);
+  // Prefer live chain read so balance stays visible when browser wallet is disconnected.
+  const yourBal = formatMon(hotWalletMon ?? account?.balances?.connectedMon);
   const tradingAddr = account!.account!.inSiteWallet;
   const keyExportAvailable = account?.account?.keyExportAvailable !== false && !account?.account?.privateKeyExportedAt;
   const visibleHoldings = holdings.filter((h) => hasPositiveBalance(h.balance));
   const tradingMonRaw = Number(account?.balances?.inSiteMon ?? "0");
   const maxTransferMon =
     direction === "deposit"
-      ? maxSpendableMon(account?.balances?.connectedMon)
+      ? maxSpendableMon(hotWalletMon ?? account?.balances?.connectedMon)
       : maxSpendableMon(account?.balances?.inSiteMon);
   const canMaxTransfer = Number(maxTransferMon) > 0;
 
@@ -855,6 +900,9 @@ export function TradeDesk() {
                 <p className="mt-1.5 font-mono text-[10px] text-mx-muted">
                   {shortAddr(account!.account!.connectedWallet)}
                 </p>
+                {!isConnected ? (
+                  <p className="mt-1 text-[10px] text-mx-muted/80">Wallet disconnected</p>
+                ) : null}
               </div>
               <div className="rounded-xl border border-mx-accent/40 bg-mx-surface-2 p-3 ring-1 ring-mx-accent/20">
                 <div className="flex flex-col gap-2">
