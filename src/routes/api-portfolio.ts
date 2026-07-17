@@ -86,13 +86,15 @@ export async function handlePortfolioApi(request: Request, env: Env): Promise<Re
   }
 
   const xUserId = match[1]!;
+  const page = Math.max(1, Number(url.searchParams.get("page") ?? 1) || 1);
+  const limit = Math.min(Math.max(1, Number(url.searchParams.get("limit") ?? 50) || 50), 50);
   const stub = coordinatorStub(env);
   const res = await stub.fetch(
-    `https://coordinator/list-by-author?authorId=${encodeURIComponent(xUserId)}&limit=50`,
+    `https://coordinator/list-by-author?authorId=${encodeURIComponent(xUserId)}&limit=200`,
   );
   const body = (await res.json()) as { trades?: TradeRecord[] };
   const trades = body.trades ?? [];
-  const transfers = await listTransfersViaRegistry(env, xUserId, 50);
+  const transfers = await listTransfersViaRegistry(env, xUserId, 200);
 
   const successStatuses = new Set(["CONFIRMED", "SUBMITTED", "DRY_RUN_SUCCESS"]);
   const byToken = new Map<
@@ -260,14 +262,25 @@ export async function handlePortfolioApi(request: Request, env: Env): Promise<Re
     };
   });
 
-  const recent = [...tradeActivities, ...transferActivities]
-    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
-    .slice(0, 30);
+  const allRecent = [...tradeActivities, ...transferActivities].sort((a, b) =>
+    a.createdAt < b.createdAt ? 1 : -1,
+  );
+  const total = allRecent.length;
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const safePage = Math.min(page, totalPages);
+  const start = (safePage - 1) * limit;
+  const recent = allRecent.slice(start, start + limit);
 
   return Response.json({
     holdings,
     recent,
     walletAddress: walletAddress ?? null,
+    page: safePage,
+    limit,
+    total,
+    totalPages,
+    hasMore: safePage < totalPages,
+    hasPrev: safePage > 1,
   });
 }
 
