@@ -821,7 +821,7 @@ export function TradeDesk() {
             Buy from X.
           </h1>
           <p className="mx-auto max-w-sm text-base leading-relaxed text-mx-muted">
-            Log in, add MON once, then tweet{" "}
+            Log in, add MON, then tweet{" "}
             <span className="text-mx-text">@monexmonad buy …</span> to trade.
           </p>
         </header>
