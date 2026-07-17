@@ -1,13 +1,15 @@
 import type { AppEnv } from "../env.js";
 import type { XClient } from "./client.js";
 import { logError, logInfo } from "../utils/logging.js";
+import { stripUrls } from "../trading/replies.js";
 
 export async function replyToMention(
   client: XClient,
   tweetId: string,
   text: string,
 ): Promise<void> {
-  await client.replyToTweet({ inReplyToTweetId: tweetId, text });
+  // Never post links — X charges heavily for URL replies.
+  await client.replyToTweet({ inReplyToTweetId: tweetId, text: stripUrls(text) });
 }
 
 export async function replySafely(

@@ -155,7 +155,7 @@ export async function executeNadfunBuy(input: {
       if (pending > nonce) {
         throw createSubmissionError(
           "SUBMISSION_UNKNOWN",
-          "nonce advanced after broadcast — check explorer before retrying",
+          "nonce advanced after broadcast — check trading wallet before retrying",
           hash,
         );
       }
