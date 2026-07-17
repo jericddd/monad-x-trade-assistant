@@ -3,7 +3,7 @@ import type { Env } from "../worker.js";
 import { createPublicBlockchainClient } from "../blockchain/client.js";
 import { parseEnvLenient } from "../env.js";
 import type { TradeRecord } from "../trading/trade-record.js";
-import { assertSiteSecret } from "./api-users.js";
+import { assertSiteSecret, listTransfersViaRegistry } from "./api-users.js";
 
 const ERC20_ABI = [
   {
@@ -48,20 +48,26 @@ export type PortfolioHolding = {
   lastAt?: string;
 };
 
-export type PortfolioTrade = {
-  tweetId: string;
-  tokenAddress: string;
-  tokenName: string;
-  tokenSymbol: string;
+export type PortfolioActivity = {
+  id: string;
+  kind: "trade" | "transfer";
+  /** buy | sell | add_funds | cash_out */
+  side: "buy" | "sell" | "add_funds" | "cash_out";
+  /** x = X mention, app = site/app */
+  source: "x" | "app";
+  tokenAddress?: string;
+  tokenName?: string;
+  tokenSymbol?: string;
+  /** Address shown in the CA column */
+  walletAddress?: string;
+  /** hot = browser wallet, in_app = trading wallet */
+  walletKind?: "hot" | "in_app";
   amountMon: string;
   status: string;
   txHash?: string;
-  walletAddress: string;
   createdAt: string;
-  /** buy | sell */
-  side: "buy" | "sell";
-  /** x = X mention, app = site/app */
-  source: "x" | "app";
+  /** @deprecated prefer id; kept for older clients */
+  tweetId?: string;
 };
 
 function coordinatorStub(env: Env): DurableObjectStub {
@@ -86,6 +92,7 @@ export async function handlePortfolioApi(request: Request, env: Env): Promise<Re
   );
   const body = (await res.json()) as { trades?: TradeRecord[] };
   const trades = body.trades ?? [];
+  const transfers = await listTransfersViaRegistry(env, xUserId, 50);
 
   const successStatuses = new Set(["CONFIRMED", "SUBMITTED", "DRY_RUN_SUCCESS"]);
   const byToken = new Map<
@@ -216,23 +223,46 @@ export async function handlePortfolioApi(request: Request, env: Env): Promise<Re
     // Metadata is best-effort.
   }
 
-  const recent: PortfolioTrade[] = trades.slice(0, 20).map((t) => {
+  const tradeActivities: PortfolioActivity[] = trades.map((t) => {
     const meta = metaCache.get(t.tokenAddress.toLowerCase());
     return {
+      id: t.tweetId,
+      kind: "trade",
       tweetId: t.tweetId,
+      side: t.action === "sell" ? "sell" : "buy",
+      source: t.source === "app" ? "app" : "x",
       tokenAddress: t.tokenAddress,
       tokenName: meta?.name ?? shortSymbol(t.tokenAddress),
       tokenSymbol: meta?.symbol ?? shortSymbol(t.tokenAddress),
       amountMon: t.requestedAmountMon,
       status: t.status,
       txHash: t.txHash,
-      walletAddress: t.walletAddress,
       createdAt: t.createdAt,
-      side: t.action === "sell" ? "sell" : "buy",
-      // Mention pipeline is X; older records without source default to x.
-      source: t.source === "app" ? "app" : "x",
     };
   });
+
+  const transferActivities: PortfolioActivity[] = transfers.map((t) => {
+    const isDeposit = t.type === "deposit";
+    return {
+      id: t.id,
+      kind: "transfer",
+      side: isDeposit ? "add_funds" : "cash_out",
+      source: "app",
+      // Destination wallet of the transfer, labeled hot vs in-app.
+      walletAddress: isDeposit ? t.inSiteWallet : t.hotWallet,
+      walletKind: isDeposit ? "in_app" : "hot",
+      tokenName: "MON",
+      tokenSymbol: "MON",
+      amountMon: t.amountMon,
+      status: t.status,
+      txHash: t.txHash,
+      createdAt: t.createdAt,
+    };
+  });
+
+  const recent = [...tradeActivities, ...transferActivities]
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+    .slice(0, 30);
 
   return Response.json({
     holdings,

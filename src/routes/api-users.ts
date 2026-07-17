@@ -7,7 +7,9 @@ import type {
   ExportKeyRequest,
   LinkedUserRecord,
   PublicLinkedUser,
+  RecordTransferRequest,
   RenewWalletRequest,
+  TransferRecord,
   WithdrawRequest,
 } from "../custodial/types.js";
 import { normalizeLinkedUser } from "../custodial/types.js";
@@ -140,7 +142,57 @@ export async function handleUsersApi(request: Request, env: Env): Promise<Respon
     return handleWithdraw(request, env);
   }
 
+  if (url.pathname === "/api/v1/users/transfers" && request.method === "POST") {
+    return handleRecordTransfer(request, env);
+  }
+
   return Response.json({ error: "not_found" }, { status: 404 });
+}
+
+async function recordTransferViaRegistry(
+  env: Env,
+  input: RecordTransferRequest,
+): Promise<TransferRecord> {
+  const stub = registryStub(env);
+  const upstream = await stub.fetch("https://registry/record-transfer", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const data = (await upstream.json()) as { transfer?: TransferRecord; error?: string };
+  if (!upstream.ok || !data.transfer) {
+    throw new Error(data.error ?? "record_transfer_failed");
+  }
+  return data.transfer;
+}
+
+export async function listTransfersViaRegistry(
+  env: Env,
+  xUserId: string,
+  limit = 50,
+): Promise<TransferRecord[]> {
+  const stub = registryStub(env);
+  const upstream = await stub.fetch(
+    `https://registry/list-transfers?xUserId=${encodeURIComponent(xUserId)}&limit=${limit}`,
+  );
+  const data = (await upstream.json()) as { transfers?: TransferRecord[] };
+  return data.transfers ?? [];
+}
+
+async function handleRecordTransfer(request: Request, env: Env): Promise<Response> {
+  const body = (await request.json()) as RecordTransferRequest;
+  // Site may only report deposits; withdraws are recorded server-side after send.
+  if (body.type !== "deposit") {
+    return badRequest("only_deposit_via_this_endpoint");
+  }
+  try {
+    const transfer = await recordTransferViaRegistry(env, body);
+    return Response.json({ transfer });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "record_transfer_failed";
+    const status = message === "user_not_linked" ? 404 : 400;
+    return Response.json({ error: message }, { status });
+  }
 }
 
 async function handleWithdraw(request: Request, env: Env): Promise<Response> {
@@ -215,6 +267,20 @@ async function handleWithdraw(request: Request, env: Env): Promise<Response> {
       gasPrice,
       chain: walletClient.chain,
     });
+
+    try {
+      await recordTransferViaRegistry(env, {
+        xUserId: body.xUserId,
+        type: "withdraw",
+        amountMon: body.amountMon,
+        txHash: hash,
+        fromAddress: walletAddress,
+        toAddress: getAddress(toAddress),
+      });
+    } catch {
+      // History is best-effort; withdraw already succeeded on-chain.
+    }
+
     return Response.json({
       ok: true,
       txHash: hash,
