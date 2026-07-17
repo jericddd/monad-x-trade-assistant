@@ -31,13 +31,18 @@ export function stripUrls(text: string): string {
 
 export type ReplyKind = "dry_run" | "submitted" | "confirmed" | "rejected" | "failed" | "unknown";
 
+/**
+ * Build X reply text. Successful live trades only reply once after confirmation
+ * ("trade successful") — callers must not post the submitted draft reply.
+ */
 export function buildTradeReply(
   record: TradeRecord,
   kind: ReplyKind,
   _explorerBaseUrl?: string,
 ): string {
   void _explorerBaseUrl; // kept for call-site compatibility; links are never included
-  const tokenShort = shortenAddress(record.tokenAddress);
+  const tokenFull = record.tokenAddress;
+  const txFull = record.txHash ?? "";
 
   let text: string;
   switch (kind) {
@@ -53,26 +58,18 @@ export function buildTradeReply(
       break;
 
     case "submitted":
-      text = [
-        "trade submitted",
-        "",
-        `spent: ${record.requestedAmountMon} MON`,
-        `token: ${tokenShort}`,
-        `minimum tokens: ${formatTokenAmount(record.minimumAmountOut)}`,
-        record.txHash ? `tx: ${shortenAddress(record.txHash)}` : "",
-      ]
-        .filter(Boolean)
-        .join("\n");
+      // Intentionally empty — X gets a single reply after on-chain confirmation.
+      text = "";
       break;
 
     case "confirmed":
       text = [
-        "trade confirmed",
+        "trade successful",
         "",
         `spent: ${record.requestedAmountMon} MON`,
         `received: ${formatTokenAmount(record.expectedAmountOut)} TOKEN`,
-        `token: ${tokenShort}`,
-        record.txHash ? `tx: ${shortenAddress(record.txHash)}` : "",
+        `token: ${tokenFull}`,
+        txFull ? `tx: ${txFull}` : "",
       ]
         .filter(Boolean)
         .join("\n");
@@ -88,11 +85,14 @@ export function buildTradeReply(
 
     case "failed":
       text = [
-        "trade failed before confirmation",
+        "trade failed",
         "",
         `reason: ${record.failureMessageSafe ?? "execution failed"}`,
         "safe to retry with a new post",
-      ].join("\n");
+        txFull ? `tx: ${txFull}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
       break;
 
     case "unknown":
@@ -101,7 +101,7 @@ export function buildTradeReply(
         "",
         "the network response was unclear after submission",
         "check your trading wallet before retrying",
-        record.txHash ? `tx: ${shortenAddress(record.txHash)}` : "",
+        txFull ? `tx: ${txFull}` : `token: ${shortenAddress(record.tokenAddress)}`,
       ]
         .filter(Boolean)
         .join("\n");
