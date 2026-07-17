@@ -894,15 +894,25 @@ export function TradeDesk() {
 
             <div className="grid grid-cols-2 gap-2">
               <div className="rounded-xl border border-mx-border bg-mx-surface-2 p-3">
-                <p className="text-[11px] text-mx-muted">Your wallet</p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] text-mx-muted">Your wallet</p>
+                  {isConnected ? (
+                    <button
+                      type="button"
+                      title="Disconnect"
+                      onClick={() => disconnect()}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-semibold text-mx-muted transition hover:bg-mx-accent/10 hover:text-mx-accent"
+                    >
+                      <LogOut className="h-3 w-3 shrink-0" />
+                      <span className="hidden min-[380px]:inline">Disconnect</span>
+                    </button>
+                  ) : null}
+                </div>
                 <p className="mt-1.5 font-display text-xl font-bold text-mx-text">{yourBal}</p>
                 <p className="text-[11px] text-mx-muted">MON</p>
                 <p className="mt-1.5 font-mono text-[10px] text-mx-muted">
                   {shortAddr(account!.account!.connectedWallet)}
                 </p>
-                {!isConnected ? (
-                  <p className="mt-1 text-[10px] text-mx-muted/80">Wallet disconnected</p>
-                ) : null}
               </div>
               <div className="rounded-xl border border-mx-accent/40 bg-mx-surface-2 p-3 ring-1 ring-mx-accent/20">
                 <div className="flex flex-col gap-2">
@@ -1337,16 +1347,6 @@ export function TradeDesk() {
             </>
           ) : null}
         </p>
-      ) : null}
-
-      {isConnected ? (
-        <button
-          type="button"
-          onClick={() => disconnect()}
-          className="mt-4 w-full text-center text-xs text-mx-muted hover:text-mx-text"
-        >
-          Disconnect browser wallet
-        </button>
       ) : null}
 
       {keyModal?.kind === "export" ? (
