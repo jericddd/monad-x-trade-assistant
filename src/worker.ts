@@ -43,15 +43,15 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
 
   if (request.method === "GET" && url.pathname === "/health") {
-    const parsed = parseEnvLenient(env as unknown as Record<string, unknown>);
-    return healthResponse(parsed);
+    // Pass raw Worker env so X_* secrets are visible (parseEnvLenient omits them).
+    return healthResponse(env as unknown as Record<string, unknown>);
   }
 
   if (request.method === "OPTIONS" && url.pathname.startsWith("/api/")) {
     return new Response(null, {
       status: 204,
       headers: {
-        "access-control-allow-origin": "https://packs.monexmonad.xyz",
+        "access-control-allow-origin": "https://trade.monexmonad.xyz",
         "access-control-allow-methods": "GET,POST,OPTIONS",
         "access-control-allow-headers": "content-type,x-site-secret",
       },
@@ -64,7 +64,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     (await handleUsersApi(request, env));
   if (apiResponse) {
     const headers = new Headers(apiResponse.headers);
-    headers.set("access-control-allow-origin", "https://packs.monexmonad.xyz");
+    headers.set("access-control-allow-origin", "https://trade.monexmonad.xyz");
     return new Response(apiResponse.body, { status: apiResponse.status, headers });
   }
 

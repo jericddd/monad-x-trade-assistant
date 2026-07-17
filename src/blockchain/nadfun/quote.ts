@@ -6,7 +6,7 @@ import {
   createPublicBlockchainClient,
   assertConfiguredChainId,
 } from "../client.js";
-import { hasContractBytecode, isTokenLocked, queryLensQuote } from "./lens.js";
+import { hasContractBytecode, isTokenUntradeable, queryLensQuote } from "./lens.js";
 import { simulateBuyTransaction } from "./simulate-buy.js";
 import { simulateSellTransaction } from "./simulate-sell.js";
 import { privateKeyToAccount } from "viem/accounts";
@@ -173,7 +173,9 @@ export class RealQuoteProvider implements QuoteProvider {
       amountInWei: input.amountInWei,
     });
 
-    const locked = await isTokenLocked({
+    // isLocked on Lens means curve locked — graduated DEX tokens still trade.
+    // Only block mid-graduation (locked && !graduated).
+    const untradeable = await isTokenUntradeable({
       publicClient: this.publicClient,
       lensAddress,
       tokenAddress: input.tokenAddress,
@@ -182,7 +184,7 @@ export class RealQuoteProvider implements QuoteProvider {
     return {
       routerAddress: quote.routerAddress,
       expectedAmountOut: quote.expectedAmountOut,
-      isLocked: locked,
+      isLocked: untradeable,
       hasBytecode: true,
     };
   }
@@ -216,7 +218,7 @@ export class RealQuoteProvider implements QuoteProvider {
       isBuy: false,
     });
 
-    const locked = await isTokenLocked({
+    const untradeable = await isTokenUntradeable({
       publicClient: this.publicClient,
       lensAddress,
       tokenAddress: input.tokenAddress,
@@ -225,7 +227,7 @@ export class RealQuoteProvider implements QuoteProvider {
     return {
       routerAddress: quote.routerAddress,
       expectedAmountOut: quote.expectedAmountOut,
-      isLocked: locked,
+      isLocked: untradeable,
       hasBytecode: true,
     };
   }

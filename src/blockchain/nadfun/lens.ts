@@ -128,6 +128,37 @@ export async function isTokenLocked(input: {
   }
 }
 
+export async function isTokenGraduated(input: {
+  publicClient: PublicClient;
+  lensAddress: `0x${string}`;
+  tokenAddress: `0x${string}`;
+}): Promise<boolean> {
+  try {
+    return await input.publicClient.readContract({
+      address: input.lensAddress,
+      abi: lensAbi,
+      functionName: "isGraduated",
+      args: [input.tokenAddress],
+    });
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * True only while the bonding curve is locked mid-graduation and DEX trading
+ * is not ready yet. Graduated (DEX) tokens report isLocked=true but remain
+ * fully tradeable via the DEX router — do not treat that as untradeable.
+ */
+export async function isTokenUntradeable(input: {
+  publicClient: PublicClient;
+  lensAddress: `0x${string}`;
+  tokenAddress: `0x${string}`;
+}): Promise<boolean> {
+  const [locked, graduated] = await Promise.all([isTokenLocked(input), isTokenGraduated(input)]);
+  return locked && !graduated;
+}
+
 export async function hasContractBytecode(input: {
   publicClient: PublicClient;
   tokenAddress: `0x${string}`;

@@ -101,6 +101,7 @@ export async function pollMentions(env: AppEnv, client: XClient): Promise<PollRe
     const replyQueue: Array<{
       tweetId: string;
       replyText?: string;
+      fallbackReplyText?: string;
       replied?: boolean;
       status?: string;
     }> = [];
@@ -117,6 +118,7 @@ export async function pollMentions(env: AppEnv, client: XClient): Promise<PollRe
           replyQueue.push({
             tweetId: tweet.id,
             replyText: result.replyText,
+            fallbackReplyText: result.fallbackReplyText,
             status: result.status,
           });
         }
@@ -186,12 +188,18 @@ export async function confirmPendingTrades(
     checked: number;
     confirmed: number;
     reverted: number;
-    replies: Array<{ tweetId: string; replyText: string; status: string }>;
+    replies: Array<{
+      tweetId: string;
+      replyText: string;
+      fallbackReplyText?: string;
+      status: string;
+    }>;
   };
 
   const replyQueue = body.replies.map((reply) => ({
     tweetId: reply.tweetId,
     replyText: reply.replyText,
+    fallbackReplyText: reply.fallbackReplyText,
     status: reply.status,
     replied: false as boolean | undefined,
   }));

@@ -41,7 +41,7 @@ export const envSchema = z
     TRADE_WALLET_PRIVATE_KEY: privateKeySchema,
     /** Master seed for per-user in-site wallets. Falls back to TRADE_WALLET_PRIVATE_KEY. */
     CUSTODIAL_MASTER_SEED: z.string().min(16).optional(),
-    /** Shared secret for packs.monexmonad.xyz → Worker link/withdraw APIs. */
+    /** Shared secret for trade.monexmonad.xyz → Worker link/withdraw APIs. */
     SITE_API_SECRET: z.string().min(16).optional(),
     NADFUN_LENS_ADDRESS: addressSchema,
     NADFUN_ALLOWED_ROUTER_ADDRESSES: z

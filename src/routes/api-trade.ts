@@ -44,7 +44,7 @@ async function userHasBoughtToken(
   );
   const body = (await res.json()) as { trades?: TradeRecord[] };
   const target = tokenAddress.toLowerCase();
-  const success = new Set(["CONFIRMED", "SUBMITTED", "DRY_RUN_SUCCESS"]);
+  const success = new Set(["CONFIRMED", "SUBMITTED"]);
   return (body.trades ?? []).some(
     (t) => t.action !== "sell" && success.has(t.status) && t.tokenAddress.toLowerCase() === target,
   );
@@ -140,8 +140,12 @@ export async function handleTradeApi(request: Request, env: Env): Promise<Respon
     await saveAppTrade(env, result.record);
 
     return Response.json({
-      ok: result.record.status === "SUBMITTED" || result.record.status === "DRY_RUN_SUCCESS",
+      ok:
+        result.record.status === "SUBMITTED" ||
+        result.record.status === "CONFIRMED" ||
+        result.record.status === "DRY_RUN_SUCCESS",
       status: result.record.status,
+      dryRun: result.record.status === "DRY_RUN_SUCCESS",
       txHash: result.record.txHash ?? null,
       tradeId: result.record.tweetId,
       action: result.record.action,

@@ -26,6 +26,8 @@ export type TradeRecord = {
   requestedAmountMon: string;
   requestedAmountWei: string;
   tokenAddress: string;
+  /** On-chain ERC-20 symbol when known (for X replies / activity). */
+  tokenSymbol?: string;
   walletAddress: string;
   routerAddress?: string;
   expectedAmountOut?: string;
@@ -63,6 +65,7 @@ export function createTradeRecord(input: {
   walletAddress: string;
   action?: TradeAction;
   source?: TradeSource;
+  tokenSymbol?: string;
 }): TradeRecord {
   const now = new Date().toISOString();
   return {
@@ -75,6 +78,7 @@ export function createTradeRecord(input: {
     requestedAmountMon: input.requestedAmountMon,
     requestedAmountWei: input.requestedAmountWei,
     tokenAddress: input.tokenAddress,
+    tokenSymbol: input.tokenSymbol,
     walletAddress: input.walletAddress,
     status: "RECEIVED",
     createdAt: now,

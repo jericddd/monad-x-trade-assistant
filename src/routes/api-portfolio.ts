@@ -96,7 +96,8 @@ export async function handlePortfolioApi(request: Request, env: Env): Promise<Re
   const trades = body.trades ?? [];
   const transfers = await listTransfersViaRegistry(env, xUserId, 200);
 
-  const successStatuses = new Set(["CONFIRMED", "SUBMITTED", "DRY_RUN_SUCCESS"]);
+  // Holdings only from real buys (dry-run never received tokens on-chain).
+  const successStatuses = new Set(["CONFIRMED", "SUBMITTED"]);
   const byToken = new Map<
     string,
     {

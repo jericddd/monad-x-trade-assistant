@@ -13,6 +13,7 @@ import { estimateBuyGas } from "../blockchain/gas.js";
 import { executeNadfunBuy, executeNadfunSell } from "../blockchain/wallet.js";
 import { erc20Abi } from "../blockchain/nadfun/abis/erc20.js";
 import { validateBuyCommand } from "../commands/validate-buy-command.js";
+import { fetchTokenSymbol } from "./token-meta.js";
 
 export type AppTradeResult = {
   record: TradeRecord;
@@ -86,7 +87,7 @@ export class AppTradeService {
       throw createTradeError("CONFIGURATION_ERROR", "wallet client unavailable");
     }
 
-    const [balance, decimals] = await Promise.all([
+    const [balance, decimals, symbol] = await Promise.all([
       live.publicClient.readContract({
         address: tokenAddress,
         abi: erc20Abi,
@@ -98,6 +99,7 @@ export class AppTradeService {
         abi: erc20Abi,
         functionName: "decimals",
       }) as Promise<number>,
+      fetchTokenSymbol(live.publicClient, tokenAddress),
     ]);
 
     if (balance <= 0n) {
@@ -151,6 +153,7 @@ export class AppTradeService {
       requestedAmountMon: formatEther(quote.expectedAmountOut),
       requestedAmountWei: amountIn.toString(),
       tokenAddress,
+      tokenSymbol: symbol,
       walletAddress: live.walletAddress,
       action: "sell",
       source: "app",
@@ -260,6 +263,14 @@ export class AppTradeService {
     );
 
     const tradeId = newAppTradeId();
+    let tokenSymbol: string | undefined;
+    try {
+      const liveForMeta = await createLiveExecutionContext(this.env, this.signerPrivateKey);
+      tokenSymbol = await fetchTokenSymbol(liveForMeta.publicClient, input.tokenAddress);
+    } catch {
+      // best-effort
+    }
+
     let record = createTradeRecord({
       tweetId: tradeId,
       authorId: input.authorId,
@@ -267,6 +278,7 @@ export class AppTradeService {
       requestedAmountMon: input.amountMon,
       requestedAmountWei: input.amountWei.toString(),
       tokenAddress: input.tokenAddress,
+      tokenSymbol,
       walletAddress: this.walletAddress,
       action: "buy",
       source: "app",

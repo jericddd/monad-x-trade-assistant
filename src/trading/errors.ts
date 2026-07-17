@@ -57,7 +57,7 @@ export const SAFE_ERROR_MESSAGES: Record<TradeErrorCode, string> = {
   INVALID_TOKEN_ADDRESS: "token address is invalid",
   TOKEN_NOT_CONTRACT: "address is not a contract",
   TOKEN_NOT_SUPPORTED: "token is not supported on Nad.fun",
-  TOKEN_LOCKED: "token is locked and cannot be traded",
+  TOKEN_LOCKED: "token is temporarily untradeable (graduating to DEX)",
   QUOTE_FAILED: "quote could not be retrieved",
   ZERO_OUTPUT: "expected output is zero",
   ROUTER_NOT_ALLOWED: "router is not allowlisted",
