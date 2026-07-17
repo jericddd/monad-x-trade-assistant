@@ -1,0 +1,35 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "monad-packs",
+  "main": "cloudflare/worker-entry.mjs",
+  "compatibility_date": "2025-03-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "services": [
+    {
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "monad-packs"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "PACK_ASSETS",
+      "bucket_name": "monad-packs-assets"
+    }
+  ],
+  "triggers": {
+    "crons": ["0 * * * *"]
+  },
+  "vars": {
+    "MONAD_PACKS_WEBSITE_URL": "https://trade.monexmonad.xyz",
+    "NEXT_PUBLIC_APP_URL": "https://trade.monexmonad.xyz",
+    "METADATA_BASE_URL": "https://trade.monexmonad.xyz/api/metadata",
+    "NEXT_PUBLIC_MONAD_CHAIN_ID": "143",
+    "NEXT_PUBLIC_MONAD_RPC_URL": "https://rpc.monad.xyz",
+    "NEXT_PUBLIC_MONAD_EXPLORER_URL": "https://monadvision.com",
+    "TRADE_WORKER_URL": "https://monad-x-trade-assistant.0xjericd.workers.dev"
+  }
+}

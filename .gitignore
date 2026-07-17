@@ -7,3 +7,9 @@ dist/
 .DS_Store
 coverage/
 .vitest/
+desk/node_modules/
+desk/.next/
+desk/.open-next/
+desk/.wrangler/
+desk/tsconfig.tsbuildinfo
+artifacts/

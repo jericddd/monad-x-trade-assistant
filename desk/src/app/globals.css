@@ -1,0 +1,158 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --mx-bg: #071210;
+  --mx-surface: #0d1c19;
+  --mx-surface-2: #132824;
+  --mx-border: rgba(94, 234, 180, 0.16);
+  --mx-accent: #5eeab4;
+  --mx-text: #e8fff6;
+  --mx-muted: #8aa89a;
+  --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+body {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(94, 234, 180, 0.14), transparent 55%),
+    radial-gradient(ellipse 40% 30% at 100% 20%, rgba(45, 212, 191, 0.06), transparent),
+    linear-gradient(180deg, #0a1613 0%, var(--mx-bg) 40%, #050c0a 100%);
+  min-height: 100vh;
+  color: var(--mx-text);
+  font-family: var(--font-sans);
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.text-mx-accent {
+  color: var(--mx-accent);
+}
+.text-mx-text {
+  color: var(--mx-text);
+}
+.text-mx-muted {
+  color: var(--mx-muted);
+}
+.bg-mx-bg {
+  background-color: var(--mx-bg);
+}
+.bg-mx-surface {
+  background-color: var(--mx-surface);
+}
+.bg-mx-surface\/80 {
+  background-color: color-mix(in srgb, var(--mx-surface) 80%, transparent);
+}
+.bg-mx-surface-2 {
+  background-color: var(--mx-surface-2);
+}
+.bg-mx-accent {
+  background-color: var(--mx-accent);
+}
+.text-mx-bg {
+  color: var(--mx-bg);
+}
+.border-mx-border {
+  border-color: var(--mx-border);
+}
+.ring-mx-accent {
+  --tw-ring-color: var(--mx-accent);
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 500ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.animate-fade-up-delay {
+  animation: fade-up 500ms cubic-bezier(0.16, 1, 0.3, 1) 80ms both;
+}
+.animate-fade-up-delay-2 {
+  animation: fade-up 500ms cubic-bezier(0.16, 1, 0.3, 1) 160ms both;
+}
+
+/* Keep legacy mp-* utilities used by shared Button component */
+:root {
+  --mp-bg: var(--mx-bg);
+  --mp-surface: var(--mx-surface);
+  --mp-surface-raised: var(--mx-surface-2);
+  --mp-border: var(--mx-border);
+  --mp-violet: #2dd4bf;
+  --mp-violet-bright: var(--mx-accent);
+  --mp-gold: #f0c14b;
+  --mp-glow: rgba(94, 234, 180, 0.25);
+  --mp-muted: var(--mx-muted);
+  --mp-text: var(--mx-text);
+  --mp-text-secondary: var(--mx-muted);
+  --mp-duration-fast: 150ms;
+  --mp-duration-normal: 250ms;
+  --mp-duration-slow: 400ms;
+  --mp-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mp-focus-ring {
+  @apply focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mp-violet-bright;
+}
+
+.shadow-glow {
+  box-shadow: 0 0 24px var(--mp-glow);
+}
+
+.ease-mp-out {
+  transition-timing-function: var(--mp-ease-out);
+}
+
+/* Themed scrollbars for portfolio / desk panels */
+.mx-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--mx-accent) 55%, transparent) var(--mx-surface-2);
+}
+
+.mx-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.mx-scroll::-webkit-scrollbar-track {
+  background: var(--mx-surface-2);
+  border-radius: 999px;
+}
+
+.mx-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--mx-accent) 45%, var(--mx-surface-2));
+  border-radius: 999px;
+  border: 2px solid var(--mx-surface-2);
+}
+
+.mx-scroll::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--mx-accent) 75%, var(--mx-surface-2));
+}
