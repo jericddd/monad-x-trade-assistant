@@ -10,6 +10,7 @@ import {
   useWaitForTransactionReceipt,
   useSignMessage,
 } from "wagmi";
+import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { createPublicClient, formatEther, http, parseEther } from "viem";
 import {
   AppWindow,
@@ -229,11 +230,12 @@ function maxSpendableMon(
 export function TradeDesk() {
   const { user, loading: authLoading, logout } = useAuth();
   const { address, isConnected, chainId } = useAccount();
-  const { connectAsync, connectors, isPending: connecting } = useConnect();
+  const { isPending: connecting } = useConnect();
+  const { openConnectModal } = useConnectModal();
   const { disconnect } = useDisconnect();
   const { switchChainAsync } = useSwitchChain();
   const { signMessageAsync } = useSignMessage();
-  const [walletPickerOpen, setWalletPickerOpen] = useState(false);
+
   const { sendTransactionAsync, data: depositHash, isPending: depositing } = useSendTransaction();
   const depositReceipt = useWaitForTransactionReceipt({ hash: depositHash });
 
@@ -430,37 +432,6 @@ export function TradeDesk() {
       window.removeEventListener("focus", onVisible);
     };
   }, [account?.linked, activityPage, refreshAccount, refreshPortfolio]);
-
-  useEffect(() => {
-    if (isConnected) setWalletPickerOpen(false);
-  }, [isConnected]);
-
-  const walletChoices = connectors.filter(
-    (c, i, arr) => arr.findIndex((x) => x.id === c.id) === i,
-  );
-
-  function connectorLabel(connector: (typeof connectors)[number]): string {
-    const id = connector.id.toLowerCase();
-    const name = connector.name?.toLowerCase() ?? "";
-    if (id.includes("metamask") || name.includes("metamask")) return "MetaMask";
-    if (id.includes("rabby") || name.includes("rabby")) return "Rabby";
-    if (id.includes("injected") || name.includes("injected")) return "Browser wallet";
-    return connector.name || "Wallet";
-  }
-
-  async function connectWithConnector(connector: (typeof connectors)[number]) {
-    try {
-      await connectAsync({ connector });
-      setWalletPickerOpen(false);
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Could not connect wallet");
-    }
-  }
-
-  function openWalletPicker() {
-    setStatus(null);
-    setWalletPickerOpen(true);
-  }
 
   useEffect(() => {
     if (!depositReceipt.isSuccess || !depositHash) return;
@@ -824,55 +795,9 @@ export function TradeDesk() {
     }
   }
 
-  function renderWalletPicker() {
-    if (!walletPickerOpen) return null;
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 px-4">
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Connect wallet"
-          className="w-full max-w-sm rounded-2xl border border-mx-border bg-mx-surface-2 p-5 shadow-glow"
-        >
-          <div className="mb-4 flex items-start justify-between gap-3">
-            <div>
-              <h3 className="font-display text-lg font-bold text-mx-text">Connect wallet</h3>
-              <p className="mt-1 text-xs text-mx-muted">Choose your personal wallet</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => !connecting && setWalletPickerOpen(false)}
-              className="rounded-md p-1 text-mx-muted hover:text-mx-text"
-              aria-label="Close"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-          <div className="space-y-2">
-            {walletChoices.map((connector) => (
-              <button
-                key={connector.uid}
-                type="button"
-                disabled={connecting}
-                onClick={() => void connectWithConnector(connector)}
-                className="flex w-full items-center justify-between gap-3 rounded-xl border border-mx-border bg-mx-surface px-4 py-3 text-left transition hover:border-mx-accent/50 hover:bg-mx-accent/10 disabled:opacity-50"
-              >
-                <span className="inline-flex items-center gap-2 text-sm font-semibold text-mx-text">
-                  <Wallet className="h-4 w-4 text-mx-accent" />
-                  {connectorLabel(connector)}
-                </span>
-                {connecting ? <Loader2 className="mx-spinner h-4 w-4 text-mx-muted" /> : null}
-              </button>
-            ))}
-          </div>
-          {walletChoices.length === 0 ? (
-            <p className="text-center text-sm text-mx-muted">
-              No browser wallet found. Install MetaMask or Rabby, then try again.
-            </p>
-          ) : null}
-        </div>
-      </div>
-    );
+  function openWalletPicker() {
+    setStatus(null);
+    openConnectModal?.();
   }
 
   const linked = Boolean(account?.linked && account.account);
@@ -982,7 +907,6 @@ export function TradeDesk() {
           ) : null}
           {status ? <p className="text-center text-sm text-red-300">{status}</p> : null}
         </div>
-        {renderWalletPicker()}
       </div>
     );
   }
@@ -1064,7 +988,9 @@ export function TradeDesk() {
                     </button>
                   ) : null}
                 </div>
-                <p className="mt-1.5 font-display text-xl font-bold text-mx-text">{yourBal}</p>
+                <p className="mt-1.5 font-display text-xl font-bold text-mx-text">
+                  {isConnected ? yourBal : "—"}
+                </p>
                 <p className="text-[11px] text-mx-muted">MON</p>
                 {isConnected ? (
                   <p className="mt-1.5 font-mono text-[10px] text-mx-muted">
@@ -1075,7 +1001,7 @@ export function TradeDesk() {
                     <p className="text-[10px] text-mx-muted">Connect personal wallet</p>
                     <button
                       type="button"
-                      disabled={connecting}
+                      disabled={connecting || !openConnectModal}
                       onClick={() => openWalletPicker()}
                       className="inline-flex w-full items-center justify-center gap-1 rounded-md bg-mx-accent/15 px-2 py-1.5 text-[10px] font-semibold text-mx-accent transition hover:bg-mx-accent/25 disabled:opacity-50"
                     >
@@ -1783,8 +1709,6 @@ export function TradeDesk() {
           </div>
         </div>
       ) : null}
-
-      {renderWalletPicker()}
     </div>
   );
 }

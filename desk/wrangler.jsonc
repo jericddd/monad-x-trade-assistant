@@ -30,6 +30,7 @@
     "NEXT_PUBLIC_MONAD_CHAIN_ID": "143",
     "NEXT_PUBLIC_MONAD_RPC_URL": "https://rpc.monad.xyz",
     "NEXT_PUBLIC_MONAD_EXPLORER_URL": "https://monadvision.com",
-    "TRADE_WORKER_URL": "https://monad-x-trade-assistant.0xjericd.workers.dev"
+    "TRADE_WORKER_URL": "https://monad-x-trade-assistant.0xjericd.workers.dev",
+    "NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID": "c4f79cc821925dfed3a9e6e1f9e0f0a0"
   }
 }
