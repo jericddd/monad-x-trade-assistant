@@ -10,7 +10,7 @@ import {
   useWaitForTransactionReceipt,
   useSignMessage,
 } from "wagmi";
-import { useConnectModal } from "@rainbow-me/rainbowkit";
+import { useAppKit } from "@reown/appkit/react";
 import { createPublicClient, formatEther, http, parseEther } from "viem";
 import {
   AppWindow,
@@ -231,7 +231,7 @@ export function TradeDesk() {
   const { user, loading: authLoading, logout } = useAuth();
   const { address, isConnected, chainId } = useAccount();
   const { isPending: connecting } = useConnect();
-  const { openConnectModal } = useConnectModal();
+  const { open } = useAppKit();
   const { disconnect } = useDisconnect();
   const { switchChainAsync } = useSwitchChain();
   const { signMessageAsync } = useSignMessage();
@@ -797,7 +797,7 @@ export function TradeDesk() {
 
   function openWalletPicker() {
     setStatus(null);
-    openConnectModal?.();
+    void open({ view: "Connect" });
   }
 
   const linked = Boolean(account?.linked && account.account);
@@ -1001,7 +1001,7 @@ export function TradeDesk() {
                     <p className="text-[10px] text-mx-muted">Connect personal wallet</p>
                     <button
                       type="button"
-                      disabled={connecting || !openConnectModal}
+                      disabled={connecting}
                       onClick={() => openWalletPicker()}
                       className="inline-flex w-full items-center justify-center gap-1 rounded-md bg-mx-accent/15 px-2 py-1.5 text-[10px] font-semibold text-mx-accent transition hover:bg-mx-accent/25 disabled:opacity-50"
                     >

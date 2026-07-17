@@ -11,7 +11,7 @@ const nextConfig = {
     ],
   },
   webpack: (config) => {
-    config.externals.push("pino-pretty", "@react-native-async-storage/async-storage");
+    config.externals.push("pino-pretty", "@react-native-async-storage/async-storage", "encoding");
     return config;
   },
 };
