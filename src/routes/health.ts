@@ -1,4 +1,3 @@
-import type { AppEnv } from "../env.js";
 import { normalizeOptionalNumericUserId } from "../x/user-id.js";
 
 function hasSecret(value: unknown): boolean {
@@ -24,7 +23,7 @@ function asBool(value: unknown, fallback: boolean): boolean {
 /**
  * Health must read secrets from the raw Worker env — parseEnvLenient omits X_* keys.
  */
-export function healthResponse(env: Partial<AppEnv> & Record<string, unknown>): Response {
+export function healthResponse(env: Record<string, unknown>): Response {
   const authorizedUserId = normalizeOptionalNumericUserId(
     typeof env.AUTHORIZED_X_USER_ID === "string" ? env.AUTHORIZED_X_USER_ID : undefined,
   );
