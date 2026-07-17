@@ -166,8 +166,23 @@ export class AppTradeService {
       slippageBps,
     });
 
+    // Sell needs an ERC-20 approve first when allowance is low. eth_call simulation
+    // fails without that allowance — skip it and let the live path approve + sell.
+    let allowance = 0n;
+    try {
+      allowance = (await live.publicClient.readContract({
+        address: tokenAddress,
+        abi: erc20Abi,
+        functionName: "allowance",
+        args: [live.walletAddress, quote.routerAddress],
+      })) as bigint;
+    } catch {
+      allowance = 0n;
+    }
+    const needsApprove = allowance < amountIn;
+
     const simulateSell = this.simulationProvider.simulateSell?.bind(this.simulationProvider);
-    if (simulateSell) {
+    if (simulateSell && !needsApprove) {
       record = updateTradeRecord(record, { status: "SIMULATING" });
       const simulation = await simulateSell({
         tokenAddress,

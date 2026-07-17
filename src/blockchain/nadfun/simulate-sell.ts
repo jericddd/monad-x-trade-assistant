@@ -1,7 +1,8 @@
 import type { PublicClient } from "viem";
 import { bondingCurveRouterAbi } from "./abis/bonding-curve-router.js";
+import { dexRouterAbi } from "./abis/dex-router.js";
 import { nadfunRouterV2Abi } from "./abis/nadfun-router-v2.js";
-import { isV2Router } from "./config.js";
+import { isDexRouter, isV2Router } from "./config.js";
 
 export async function simulateSellTransaction(input: {
   publicClient: PublicClient;
@@ -28,6 +29,17 @@ export async function simulateSellTransaction(input: {
         address: input.routerAddress,
         abi: nadfunRouterV2Abi,
         functionName: "sellToNative",
+        args: [params],
+      });
+      return { ok: true };
+    }
+
+    if (isDexRouter(input.routerAddress)) {
+      await input.publicClient.simulateContract({
+        account: input.account,
+        address: input.routerAddress,
+        abi: dexRouterAbi,
+        functionName: "sell",
         args: [params],
       });
       return { ok: true };
