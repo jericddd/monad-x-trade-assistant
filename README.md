@@ -25,7 +25,7 @@ Buy Nad.fun tokens on **Monad mainnet** by mentioning [@monexmonad](https://x.co
 1. Sign in with X on the desk → link a browser wallet → fund an in-site trading wallet
 2. Post on X: `@monexmonad buy <amount> mon <tokenAddress>`
 3. Worker quotes Nad.fun, simulates, signs locally, broadcasts on Monad
-4. Bot replies once after confirmation (spent / received — no URLs or `0x` hex)
+4. Bot replies once after confirmation (spent / received — no URLs or `0x` hex; X blocks crypto addresses for new app auth)
 5. Desk shows live portfolio, activity, add-funds / cash-out, and buy/sell for held tokens
 
 ## Command format
@@ -33,6 +33,15 @@ Buy Nad.fun tokens on **Monad mainnet** by mentioning [@monexmonad](https://x.co
 ```text
 @monexmonad buy 1 mon 0x978Ae7298D48Cf0f8d1fdB26abC12bfACFcC7777
 ```
+
+## Architecture
+
+- Cloudflare Worker + cron (`* * * * *`) for X mention polling + receipt confirmation
+- Durable Objects: `TradeCoordinator` (idempotency / limits) + `UserRegistry` (linked users / custodial wallets)
+- Local transaction signing (never `eth_signTransaction` on public RPC)
+- Site APIs under `/api/v1/users/*` for [trade.monexmonad.xyz](https://trade.monexmonad.xyz)
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Deploy
 
@@ -44,6 +53,8 @@ npx wrangler deploy
 curl -s https://monad-x-trade-assistant.0xjericd.workers.dev/health
 ```
 
+Expect `live: true`, `xOAuthConfigured: true`, `dryRun: false`.
+
 ### Desk (trade.monexmonad.xyz)
 
 ```bash
@@ -53,7 +64,16 @@ npm run build:cloudflare
 npx opennextjs-cloudflare deploy
 ```
 
-Cloudflare Worker name for the desk remains `monad-packs` so the existing custom domain and secrets keep working. The GitHub source of truth is this repo’s `desk/` folder.
+Cloudflare Worker name for the desk remains `monad-packs` so the existing custom domain and secrets keep working. Source of truth is this repo’s `desk/` folder.
+
+## Production flags (this deploy)
+
+| Var                 | Live value |
+| ------------------- | ---------- |
+| `TRADING_ENABLED`   | `true`     |
+| `TRADE_DRY_RUN`     | `false`    |
+| `MAX_MON_PER_TRADE` | `10`       |
+| `MAX_MON_PER_DAY`   | `30`       |
 
 ## Local development
 
