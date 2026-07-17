@@ -3,6 +3,7 @@
 Buy Nad.fun tokens on **Monad mainnet** by mentioning [@monexmonad](https://x.com/monexmonad) on X. Fund a custodial trading wallet on the web desk, then trade from X (or buy/sell held tokens on the desk).
 
 **Live product**
+
 - Desk: [https://trade.monexmonad.xyz](https://trade.monexmonad.xyz)
 - Worker: [https://monad-x-trade-assistant.0xjericd.workers.dev/health](https://monad-x-trade-assistant.0xjericd.workers.dev/health)
 
@@ -10,11 +11,11 @@ Buy Nad.fun tokens on **Monad mainnet** by mentioning [@monexmonad](https://x.co
 
 ## What it does
 
-1. Sign in with X on the desk → link a browser wallet → fund an in-site trading wallet  
-2. Post on X: `@monexmonad buy <amount> mon <tokenAddress>`  
-3. Worker quotes Nad.fun, simulates, signs locally, broadcasts on Monad  
-4. Bot replies once after confirmation (spent / received — no URLs or `0x` hex; X blocks crypto addresses for new app auth)  
-5. Desk shows live portfolio, activity, add-funds / cash-out, and buy/sell for tokens you already hold  
+1. Sign in with X on the desk → link a browser wallet → fund an in-site trading wallet
+2. Post on X: `@monexmonad buy <amount> mon <tokenAddress>`
+3. Worker quotes Nad.fun, simulates, signs locally, broadcasts on Monad
+4. Bot replies once after confirmation (spent / received — no URLs or `0x` hex; X blocks crypto addresses for new app auth)
+5. Desk shows live portfolio, activity, add-funds / cash-out, and buy/sell for tokens you already hold
 
 ## Command format
 
@@ -26,10 +27,10 @@ Strict parser (no LLM). Amount is native MON spent.
 
 ## Architecture
 
-- Cloudflare Worker + cron (`* * * * *`) for X mention polling + receipt confirmation  
-- Durable Objects: `TradeCoordinator` (idempotency / limits) + `UserRegistry` (linked users / custodial wallets)  
-- Local transaction signing (never `eth_signTransaction` on public RPC)  
-- Site APIs under `/api/v1/users/*` for [trade.monexmonad.xyz](https://trade.monexmonad.xyz)  
+- Cloudflare Worker + cron (`* * * * *`) for X mention polling + receipt confirmation
+- Durable Objects: `TradeCoordinator` (idempotency / limits) + `UserRegistry` (linked users / custodial wallets)
+- Local transaction signing (never `eth_signTransaction` on public RPC)
+- Site APIs under `/api/v1/users/*` for [trade.monexmonad.xyz](https://trade.monexmonad.xyz)
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
@@ -37,12 +38,12 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 Configured in `wrangler.toml` / secrets for the live Worker:
 
-| Var | Live value |
-|-----|------------|
-| `TRADING_ENABLED` | `true` |
-| `TRADE_DRY_RUN` | `false` |
-| `MAX_MON_PER_TRADE` | `10` |
-| `MAX_MON_PER_DAY` | `30` |
+| Var                 | Live value |
+| ------------------- | ---------- |
+| `TRADING_ENABLED`   | `true`     |
+| `TRADE_DRY_RUN`     | `false`    |
+| `MAX_MON_PER_TRADE` | `10`       |
+| `MAX_MON_PER_DAY`   | `30`       |
 
 Check anytime:
 
@@ -81,9 +82,9 @@ Set `TRADING_ENABLED=false` (and preferably `TRADE_DRY_RUN=true`), then `npx wra
 
 ## Demo checklist
 
-1. Open [trade.monexmonad.xyz](https://trade.monexmonad.xyz) → Continue with X → link wallet → add funds  
-2. Post a small buy on X to `@monexmonad`  
-3. Show bot reply + desk Activity / Portfolio (explorer tx link on Activity)  
-4. Optional: buy/sell a held token from Portfolio on the desk  
+1. Open [trade.monexmonad.xyz](https://trade.monexmonad.xyz) → Continue with X → link wallet → add funds
+2. Post a small buy on X to `@monexmonad`
+3. Show bot reply + desk Activity / Portfolio (explorer tx link on Activity)
+4. Optional: buy/sell a held token from Portfolio on the desk
 
 Add your demo video link here when ready: `<!-- DEMO_VIDEO_URL -->`
