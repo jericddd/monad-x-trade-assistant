@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 export function Spinner({ className, label }: { className?: string; label?: string }) {
   return (
     <span className={cn("inline-flex items-center gap-2", className)} role="status" aria-live="polite">
-      <Loader2 className="h-4 w-4 animate-spin text-mp-violet-bright" aria-hidden />
+      <Loader2 className="mx-spinner h-4 w-4 text-mp-violet-bright" aria-hidden />
       {label && <span>{label}</span>}
     </span>
   );
@@ -13,7 +13,7 @@ export function Spinner({ className, label }: { className?: string; label?: stri
 export function PageLoader({ label = "Loading…" }: { label?: string }) {
   return (
     <div className="flex min-h-[40vh] flex-col items-center justify-center gap-4 py-16">
-      <Loader2 className="h-8 w-8 animate-spin text-mp-violet-bright" aria-hidden />
+      <Loader2 className="mx-spinner h-8 w-8 text-mp-violet-bright" aria-hidden />
       <p className="text-sm text-mp-text-secondary">{label}</p>
     </div>
   );

@@ -723,7 +723,7 @@ export function TradeDesk() {
     return (
       <div className="mx-auto flex min-h-[60vh] w-full max-w-md flex-col items-center justify-center gap-3 text-center">
         <p className="text-sm font-semibold tracking-[0.22em] text-mx-accent uppercase">MonEx</p>
-        <Loader2 className="h-5 w-5 animate-spin text-mx-muted" />
+        <Loader2 className="mx-spinner h-5 w-5 text-mx-muted" />
       </div>
     );
   }
@@ -822,7 +822,7 @@ export function TradeDesk() {
           )}
           {loadingAccount ? (
             <p className="flex items-center justify-center gap-2 text-sm text-mx-muted">
-              <Loader2 className="h-4 w-4 animate-spin" /> Setting up trading wallet…
+              <Loader2 className="mx-spinner h-4 w-4" /> Setting up trading wallet…
             </p>
           ) : null}
           {status ? <p className="text-center text-sm text-red-300">{status}</p> : null}
@@ -1094,7 +1094,7 @@ export function TradeDesk() {
             <div className="mx-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-xl border border-mx-border bg-mx-surface-2">
               {loadingPortfolio ? (
                 <p className="flex items-center gap-2 px-4 py-8 text-sm text-mx-muted">
-                  <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+                  <Loader2 className="mx-spinner h-4 w-4" /> Loading…
                 </p>
               ) : visibleHoldings.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center px-4 py-10 text-center">
@@ -1161,7 +1161,7 @@ export function TradeDesk() {
           <div className="rounded-2xl border border-mx-border bg-mx-surface/80 p-4">
             {loadingPortfolio ? (
               <p className="flex items-center gap-2 py-8 text-sm text-mx-muted">
-                <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+                <Loader2 className="mx-spinner h-4 w-4" /> Loading…
               </p>
             ) : recentTrades.length === 0 ? (
               <p className="py-8 text-center text-xs text-mx-muted">No activity yet.</p>
