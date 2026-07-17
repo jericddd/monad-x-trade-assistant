@@ -1,12 +1,69 @@
 import type { Hex, PublicClient, WalletClient } from "viem";
+import { keccak256 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { isAllowlistedRouter } from "../utils/address.js";
 import { createTradeError } from "../trading/errors.js";
+import { createSubmissionError } from "../trading/submission-error.js";
 import { buildBuyTransaction } from "./nadfun/build-buy.js";
+
+/** Require a local private-key account — never eth_signTransaction over RPC. */
+function requireLocalSigner(walletClient: WalletClient) {
+  const account = walletClient.account;
+  if (!account || typeof account === "string" || account.type !== "local") {
+    throw createTradeError(
+      "CONFIGURATION_ERROR",
+      "local signer required — refusing RPC eth_signTransaction",
+    );
+  }
+  if (!account.signTransaction) {
+    throw createTradeError("CONFIGURATION_ERROR", "local signer cannot sign transactions");
+  }
+  return account;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isTransientBroadcastError(message: string): boolean {
+  return /timeout|network|fetch|ECONNRESET|ECONNREFUSED|ETIMEDOUT|429|5\d\d|socket|aborted|failed to fetch/i.test(
+    message,
+  );
+}
+
+function isAlreadyKnownError(message: string): boolean {
+  return /already known|known transaction|nonce too low/i.test(message);
+}
+
+async function isTxVisible(publicClient: PublicClient, hash: Hex): Promise<boolean> {
+  try {
+    const tx = await publicClient.getTransaction({ hash });
+    return Boolean(tx);
+  } catch {
+    return false;
+  }
+}
+
+async function waitForTxVisible(
+  publicClient: PublicClient,
+  hash: Hex,
+  timeoutMs: number,
+): Promise<boolean> {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    if (await isTxVisible(publicClient, hash)) return true;
+    await sleep(500);
+  }
+  return false;
+}
 
 /**
  * Restricted signer — only Nad.fun buy transactions to allowlisted routers.
- * Never expose a generic sendTransaction(to, data, value).
+ *
+ * Wallet-style flow: prepare + sign locally (so we always know the hash), then
+ * broadcast the raw tx with retries / multi-RPC. Re-broadcasting the same raw
+ * payload is safe. This avoids the old "sendTransaction timed out with no hash"
+ * UNKNOWN path that browser wallets rarely hit.
  */
 export async function executeNadfunBuy(input: {
   publicClient: PublicClient;
@@ -21,8 +78,6 @@ export async function executeNadfunBuy(input: {
   gas?: bigint;
   gasPrice?: bigint;
 }): Promise<`0x${string}`> {
-  void input.publicClient;
-
   if (!isAllowlistedRouter(input.routerAddress, input.allowedRouters)) {
     throw createTradeError("ROUTER_NOT_ALLOWED");
   }
@@ -35,24 +90,110 @@ export async function executeNadfunBuy(input: {
     routerAddress: input.routerAddress,
   });
 
+  // Slight tip over estimate to improve inclusion under load.
+  const gasPrice = input.gasPrice != null ? (input.gasPrice * 112n) / 100n : undefined;
+
+  let serialized: Hex;
+  let hash: Hex;
+  let nonce: number | undefined;
+
   try {
-    const hash = await input.walletClient.sendTransaction({
-      account: input.walletAddress,
+    // Pass the LocalAccount (not an address string). Address-only accounts make
+    // viem call eth_signTransaction on the RPC — public nodes reject that.
+    const account = requireLocalSigner(input.walletClient);
+    if (account.address.toLowerCase() !== input.walletAddress.toLowerCase()) {
+      throw createTradeError("CONFIGURATION_ERROR", "signer address mismatch");
+    }
+
+    const request = await input.walletClient.prepareTransactionRequest({
+      account,
       to: input.routerAddress,
       data,
       value: input.amountInWei,
       gas: input.gas,
-      gasPrice: input.gasPrice,
+      gasPrice,
       chain: input.walletClient.chain,
     });
-    return hash;
+    nonce = typeof request.nonce === "number" ? request.nonce : undefined;
+    // Sign with the local account API — never walletClient.signTransaction with
+    // an address-only account (that path hits eth_signTransaction on the node).
+    // Strip `account` from the prepared request; LocalAccount.signTransaction
+    // expects a TransactionSerializable payload only.
+    const { account: _account, ...unsigned } = request as typeof request & {
+      account?: unknown;
+    };
+    serialized = await account.signTransaction(
+      unsigned as Parameters<NonNullable<typeof account.signTransaction>>[0],
+    );
+    hash = keccak256(serialized);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "submission failed";
-    if (/timeout|network|fetch|ECONNRESET|5\d\d/i.test(message)) {
-      throw createTradeError("SUBMISSION_UNKNOWN");
-    }
-    throw createTradeError("SUBMISSION_FAILED");
+    if (error instanceof Error && "code" in error) throw error;
+    const message = error instanceof Error ? error.message : "sign failed";
+    throw createTradeError("SUBMISSION_FAILED", message.slice(0, 120));
   }
+
+  const maxAttempts = 5;
+  let lastMessage = "broadcast failed";
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      const sent = await input.publicClient.sendRawTransaction({
+        serializedTransaction: serialized,
+      });
+      return (sent || hash) as `0x${string}`;
+    } catch (error) {
+      lastMessage = error instanceof Error ? error.message : "broadcast failed";
+
+      // Node already has this exact payload — treat as success if visible.
+      if (isAlreadyKnownError(lastMessage)) {
+        if (await waitForTxVisible(input.publicClient, hash, 4_000)) {
+          return hash as `0x${string}`;
+        }
+      }
+
+      if (await isTxVisible(input.publicClient, hash)) {
+        return hash as `0x${string}`;
+      }
+
+      const transient = isTransientBroadcastError(lastMessage);
+      if (!transient && attempt >= 1) {
+        break;
+      }
+
+      await sleep(250 * (attempt + 1));
+
+      // Same signed payload can be re-broadcast safely.
+      if (await waitForTxVisible(input.publicClient, hash, 1_200)) {
+        return hash as `0x${string}`;
+      }
+    }
+  }
+
+  if (await waitForTxVisible(input.publicClient, hash, 3_000)) {
+    return hash as `0x${string}`;
+  }
+
+  // If the nonce moved, something may have landed — ask user to verify.
+  if (nonce != null) {
+    try {
+      const pending = await input.publicClient.getTransactionCount({
+        address: input.walletAddress,
+        blockTag: "pending",
+      });
+      if (pending > nonce) {
+        throw createSubmissionError(
+          "SUBMISSION_UNKNOWN",
+          "nonce advanced after broadcast — check trading wallet before retrying",
+          hash,
+        );
+      }
+    } catch (error) {
+      if (error instanceof Error && "code" in error) throw error;
+    }
+  }
+
+  // Signed but never seen on any RPC — safe to retry with a new command.
+  throw createSubmissionError("SUBMISSION_FAILED", "broadcast did not land — safe to retry", hash);
 }
 
 export function getTradeWalletAddress(privateKey: string): `0x${string}` {

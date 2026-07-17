@@ -34,6 +34,8 @@ export const envSchema = z
     // Bootstrap allowlist (legacy single-user). Multi-user auth uses USER_REGISTRY.
     AUTHORIZED_X_USER_ID: userIdSchema.optional(),
     MONAD_RPC_URL: z.string().url(),
+    /** Optional comma-separated RPC fallbacks for resilient broadcast. */
+    MONAD_RPC_FALLBACK_URLS: z.string().optional(),
     MONAD_CHAIN_ID: z.coerce.number().int().positive(),
     MONAD_EXPLORER_TX_URL: z.string().url(),
     TRADE_WALLET_PRIVATE_KEY: privateKeySchema,
@@ -155,6 +157,10 @@ export function parseEnvLenient(raw: Record<string, unknown>): Partial<AppEnv> {
     MIN_WALLET_RESERVE_MON: String(defaults.MIN_WALLET_RESERVE_MON ?? "1"),
     MONAD_CHAIN_ID: Number(defaults.MONAD_CHAIN_ID ?? 143),
     MONAD_RPC_URL: typeof defaults.MONAD_RPC_URL === "string" ? defaults.MONAD_RPC_URL : undefined,
+    MONAD_RPC_FALLBACK_URLS:
+      typeof defaults.MONAD_RPC_FALLBACK_URLS === "string"
+        ? defaults.MONAD_RPC_FALLBACK_URLS
+        : undefined,
     MONAD_EXPLORER_TX_URL:
       typeof defaults.MONAD_EXPLORER_TX_URL === "string"
         ? defaults.MONAD_EXPLORER_TX_URL

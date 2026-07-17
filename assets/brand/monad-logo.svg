@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Monad">
+  <!-- Official-style Monad mark: purple disc + tilted rounded-square ring -->
+  <circle cx="64" cy="64" r="64" fill="#6E54FF"/>
+  <g transform="rotate(45 64 64)">
+    <rect
+      x="30"
+      y="30"
+      width="68"
+      height="68"
+      rx="16"
+      ry="16"
+      fill="none"
+      stroke="#FFFFFF"
+      stroke-width="16"
+    />
+  </g>
+</svg>

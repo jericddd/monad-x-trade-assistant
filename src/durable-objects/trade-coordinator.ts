@@ -81,6 +81,10 @@ export class TradeCoordinator implements DurableObject {
         typeof env.MONAD_RPC_URL === "string" && env.MONAD_RPC_URL.trim()
           ? env.MONAD_RPC_URL.trim().replace(/^["']|["']$/g, "")
           : this.env.MONAD_RPC_URL,
+      MONAD_RPC_FALLBACK_URLS:
+        typeof env.MONAD_RPC_FALLBACK_URLS === "string" && env.MONAD_RPC_FALLBACK_URLS.trim()
+          ? env.MONAD_RPC_FALLBACK_URLS.trim()
+          : this.env.MONAD_RPC_FALLBACK_URLS,
       MONAD_CHAIN_ID:
         env.MONAD_CHAIN_ID !== undefined ? Number(env.MONAD_CHAIN_ID) : this.env.MONAD_CHAIN_ID,
       NADFUN_LENS_ADDRESS:

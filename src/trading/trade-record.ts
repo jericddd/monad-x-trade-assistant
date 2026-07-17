@@ -12,12 +12,17 @@ export type TradeStatus =
   | "REJECTED"
   | "UNKNOWN";
 
+export type TradeAction = "buy" | "sell";
+export type TradeSource = "x" | "app";
+
 export type TradeRecord = {
   version: 1;
   tweetId: string;
   authorId: string;
   commandTextHash: string;
-  action: "buy";
+  action: TradeAction;
+  /** Where the trade was initiated. Defaults to X for mention-driven buys. */
+  source?: TradeSource;
   requestedAmountMon: string;
   requestedAmountWei: string;
   tokenAddress: string;
@@ -56,6 +61,8 @@ export function createTradeRecord(input: {
   requestedAmountWei: string;
   tokenAddress: string;
   walletAddress: string;
+  action?: TradeAction;
+  source?: TradeSource;
 }): TradeRecord {
   const now = new Date().toISOString();
   return {
@@ -63,7 +70,8 @@ export function createTradeRecord(input: {
     tweetId: input.tweetId,
     authorId: input.authorId,
     commandTextHash: input.commandTextHash,
-    action: "buy",
+    action: input.action ?? "buy",
+    source: input.source ?? "x",
     requestedAmountMon: input.requestedAmountMon,
     requestedAmountWei: input.requestedAmountWei,
     tokenAddress: input.tokenAddress,

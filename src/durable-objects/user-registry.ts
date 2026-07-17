@@ -7,13 +7,20 @@ import {
   type ExportKeyRequest,
   type LinkUserRequest,
   type LinkedUserRecord,
+  type RecordTransferRequest,
   type RenewWalletRequest,
+  type TransferRecord,
 } from "../custodial/types.js";
 
 const USER_KEY_PREFIX = "user:x:";
+const TRANSFER_KEY_PREFIX = "transfers:x:";
 
 function userKey(xUserId: string): string {
   return `${USER_KEY_PREFIX}${xUserId}`;
+}
+
+function transferKey(xUserId: string): string {
+  return `${TRANSFER_KEY_PREFIX}${xUserId}`;
 }
 
 export class UserRegistry implements DurableObject {
@@ -99,6 +106,28 @@ export class UserRegistry implements DurableObject {
         user: user ? toPublicLinkedUser(user) : null,
         bootstrap: Boolean(bootstrapId) && xUserId === bootstrapId && !user,
       });
+    }
+
+    if (url.pathname === "/record-transfer" && request.method === "POST") {
+      const body = (await request.json()) as RecordTransferRequest;
+      try {
+        const transfer = await this.recordTransfer(body);
+        return Response.json({ transfer });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "record_transfer_failed";
+        const status = message === "user_not_linked" ? 404 : 400;
+        return Response.json({ error: message }, { status });
+      }
+    }
+
+    if (url.pathname === "/list-transfers" && request.method === "GET") {
+      const xUserId = url.searchParams.get("xUserId");
+      if (!xUserId || !/^\d+$/.test(xUserId)) {
+        return Response.json({ error: "invalid_x_user_id" }, { status: 400 });
+      }
+      const limit = Math.min(Number(url.searchParams.get("limit") ?? 50), 100);
+      const transfers = await this.listTransfers(xUserId, limit);
+      return Response.json({ transfers });
     }
 
     return new Response("not found", { status: 404 });
@@ -235,6 +264,64 @@ export class UserRegistry implements DurableObject {
       warning:
         "Move all funds out of the previous trading wallet before renewing. Funds left behind stay on the old address.",
     };
+  }
+
+  async listTransfers(xUserId: string, limit: number): Promise<TransferRecord[]> {
+    const current = (await this.state.storage.get<TransferRecord[]>(transferKey(xUserId))) ?? [];
+    return current.slice(0, limit);
+  }
+
+  async recordTransfer(input: RecordTransferRequest): Promise<TransferRecord> {
+    if (!input.xUserId || !/^\d+$/.test(input.xUserId)) {
+      throw new Error("invalid_x_user_id");
+    }
+    if (input.type !== "deposit" && input.type !== "withdraw") {
+      throw new Error("invalid_transfer_type");
+    }
+    if (!input.amountMon || !/^\d+(?:\.\d+)?$/.test(input.amountMon)) {
+      throw new Error("invalid_amount");
+    }
+    if (!input.txHash || !/^0x[a-fA-F0-9]{64}$/.test(input.txHash)) {
+      throw new Error("invalid_tx_hash");
+    }
+
+    const user = await this.getUser(input.xUserId);
+    if (!user) throw new Error("user_not_linked");
+
+    const txHash = input.txHash.toLowerCase() as `0x${string}`;
+    const existing = await this.listTransfers(input.xUserId, 200);
+    const already = existing.find((t) => t.txHash.toLowerCase() === txHash);
+    if (already) return already;
+
+    const hotWallet = user.connectedWallet;
+    const inSiteWallet = user.inSiteWallet;
+    const fromAddress = isAddress(input.fromAddress ?? "")
+      ? (getAddress(input.fromAddress!) as `0x${string}`)
+      : input.type === "deposit"
+        ? hotWallet
+        : inSiteWallet;
+    const toAddress = isAddress(input.toAddress ?? "")
+      ? (getAddress(input.toAddress!) as `0x${string}`)
+      : input.type === "deposit"
+        ? inSiteWallet
+        : hotWallet;
+
+    const transfer: TransferRecord = {
+      id: txHash,
+      xUserId: input.xUserId,
+      type: input.type,
+      amountMon: input.amountMon,
+      txHash,
+      fromAddress,
+      toAddress,
+      hotWallet,
+      inSiteWallet,
+      status: "CONFIRMED",
+      createdAt: new Date().toISOString(),
+    };
+
+    await this.state.storage.put(transferKey(input.xUserId), [transfer, ...existing].slice(0, 200));
+    return transfer;
   }
 }
 

@@ -34,6 +34,32 @@ export type RenewWalletRequest = {
   confirmRenew: boolean;
 };
 
+export type TransferType = "deposit" | "withdraw";
+
+/** Add-funds / cash-out history for the activity feed. */
+export type TransferRecord = {
+  id: string;
+  xUserId: string;
+  type: TransferType;
+  amountMon: string;
+  txHash: `0x${string}`;
+  fromAddress: `0x${string}`;
+  toAddress: `0x${string}`;
+  hotWallet: `0x${string}`;
+  inSiteWallet: `0x${string}`;
+  status: "CONFIRMED";
+  createdAt: string;
+};
+
+export type RecordTransferRequest = {
+  xUserId: string;
+  type: TransferType;
+  amountMon: string;
+  txHash: string;
+  fromAddress?: string;
+  toAddress?: string;
+};
+
 /** Safe fields for site dashboards — never includes private key material. */
 export type PublicLinkedUser = Omit<LinkedUserRecord, "privateKeyExportedAt"> & {
   keyExportAvailable: boolean;

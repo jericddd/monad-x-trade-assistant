@@ -1,7 +1,6 @@
 import {
   createPublicClient,
   createWalletClient,
-  http,
   type Hex,
   type PublicClient,
   type WalletClient,
@@ -10,6 +9,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import type { AppEnv } from "../env.js";
 import { assertChainId, monad } from "./chain.js";
 import { createTradeError } from "../trading/errors.js";
+import { createMonadTransport, resolveMonadRpcUrls } from "./rpc.js";
 
 export type BlockchainClients = {
   publicClient: PublicClient;
@@ -18,20 +18,25 @@ export type BlockchainClients = {
   chainId: number;
 };
 
+function monadChain(env: Partial<AppEnv>, rpcUrl: string) {
+  return {
+    ...monad,
+    id: env.MONAD_CHAIN_ID ?? monad.id,
+    rpcUrls: {
+      default: { http: [rpcUrl] },
+    },
+  };
+}
+
 export function createPublicBlockchainClient(env: Partial<AppEnv>): PublicClient {
-  if (!env.MONAD_RPC_URL) {
+  const rpcUrls = resolveMonadRpcUrls(env);
+  if (rpcUrls.length === 0) {
     throw createTradeError("CONFIGURATION_ERROR", "MONAD_RPC_URL is required");
   }
 
   return createPublicClient({
-    chain: {
-      ...monad,
-      id: env.MONAD_CHAIN_ID ?? monad.id,
-      rpcUrls: {
-        default: { http: [env.MONAD_RPC_URL] },
-      },
-    },
-    transport: http(env.MONAD_RPC_URL),
+    chain: monadChain(env, rpcUrls[0]!),
+    transport: createMonadTransport(rpcUrls),
   });
 }
 
@@ -51,18 +56,20 @@ export function createWalletFromPrivateKey(
   privateKey: string,
   rpcUrl: string,
   chainId: number,
+  rpcUrls?: string[],
 ): { walletClient: WalletClient; walletAddress: `0x${string}` } {
   const account = privateKeyToAccount(privateKey as Hex);
+  const urls = rpcUrls && rpcUrls.length > 0 ? rpcUrls : [rpcUrl];
   const walletClient = createWalletClient({
     account,
     chain: {
       ...monad,
       id: chainId,
       rpcUrls: {
-        default: { http: [rpcUrl] },
+        default: { http: urls },
       },
     },
-    transport: http(rpcUrl),
+    transport: createMonadTransport(urls),
   });
 
   return {
@@ -79,12 +86,14 @@ export async function createBlockchainClients(
   const expectedChainId = env.MONAD_CHAIN_ID ?? monad.id;
   await assertConfiguredChainId(publicClient, expectedChainId);
 
+  const rpcUrls = resolveMonadRpcUrls(env);
   const privateKey = signerPrivateKey ?? env.TRADE_WALLET_PRIVATE_KEY;
   if (privateKey) {
     const { walletClient, walletAddress } = createWalletFromPrivateKey(
       privateKey,
-      env.MONAD_RPC_URL!,
+      rpcUrls[0] ?? env.MONAD_RPC_URL!,
       expectedChainId,
+      rpcUrls,
     );
     return {
       publicClient,
