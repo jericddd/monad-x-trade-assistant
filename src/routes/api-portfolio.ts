@@ -58,6 +58,10 @@ export type PortfolioTrade = {
   txHash?: string;
   walletAddress: string;
   createdAt: string;
+  /** buy | sell */
+  side: "buy" | "sell";
+  /** x = X mention, app = site/app */
+  source: "x" | "app";
 };
 
 function coordinatorStub(env: Env): DurableObjectStub {
@@ -224,6 +228,9 @@ export async function handlePortfolioApi(request: Request, env: Env): Promise<Re
       txHash: t.txHash,
       walletAddress: t.walletAddress,
       createdAt: t.createdAt,
+      side: t.action === "sell" ? "sell" : "buy",
+      // Mention pipeline is X; older records without source default to x.
+      source: t.source === "app" ? "app" : "x",
     };
   });
 
