@@ -605,6 +605,20 @@ export function TradeDesk() {
     setKeyCopied(false);
   }
 
+  async function handleLogout() {
+    setStatus(null);
+    setTxUrl(null);
+    setTradeModal(null);
+    setTradeSuccess(null);
+    setKeyModal(null);
+    setAccount(null);
+    setAccountReady(false);
+    setHoldings([]);
+    setRecentTrades([]);
+    setHotWalletMon(null);
+    await logout();
+  }
+
   function openTradeModal(action: "buy" | "sell", holding: PortfolioHolding) {
     setTradeModal({
       action,
@@ -803,7 +817,7 @@ export function TradeDesk() {
           </div>
           <button
             type="button"
-            onClick={() => void logout()}
+            onClick={() => void handleLogout()}
             className="inline-flex items-center gap-1 text-xs text-mx-muted hover:text-mx-text"
           >
             <LogOut className="h-3.5 w-3.5" /> Log out
@@ -897,7 +911,7 @@ export function TradeDesk() {
           </button>
           <button
             type="button"
-            onClick={() => void logout()}
+            onClick={() => void handleLogout()}
             className="inline-flex items-center gap-1 text-xs text-mx-muted hover:text-mx-text"
           >
             <LogOut className="h-3.5 w-3.5" /> Log out
