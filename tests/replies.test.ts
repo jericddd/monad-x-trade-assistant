@@ -27,9 +27,10 @@ describe("buildTradeReply", () => {
     expect(buildTradeReply(base, "submitted")).toBe("");
   });
 
-  it("formats token as full CA / $TICKER", () => {
+  it("formats token as full CA and keeps $TICKER on received", () => {
     const text = buildTradeReply({ ...base, status: "CONFIRMED" }, "confirmed");
-    expect(text).toContain("token: 0x978Ae7298D48Cf0f8d1fdB26abC12bfACFcC7777 / $MONEX");
+    expect(text).toContain("token: 0x978Ae7298D48Cf0f8d1fdB26abC12bfACFcC7777");
+    expect(text).not.toContain("/ $MONEX");
     expect(text).toContain("received: 3935.98324 $MONEX");
     expect(text).toContain(`tx: ${base.txHash}`);
     expect(text).not.toMatch(/https?:\/\//);
