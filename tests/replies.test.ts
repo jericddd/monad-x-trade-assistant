@@ -35,20 +35,21 @@ describe("buildTradeReply", () => {
     expect(buildTradeReply(base, "submitted")).toBe("");
   });
 
-  it("formats confirmed success without crypto addresses or cashtags", () => {
+  it("formats confirmed success as headline + spent + received $TICKER only", () => {
     const text = buildTradeReply({ ...base, status: "CONFIRMED" }, "confirmed");
-    expect(text).toContain("received: 3935.98324 MONEX");
-    expect(text).toContain("spent: 1 MON");
-    expect(text).toContain("MonEx desk");
-    expect(text).not.toContain("$MONEX");
+    const headline = pickSuccessHeadline(base.tweetId);
+    expect(text).toBe(
+      [headline, "", "spent: 1 MON", "received: 3935.98324 $MONEX"].join("\n"),
+    );
     expect(text).not.toMatch(/0x[a-fA-F0-9]{6,}/);
     expect(text).not.toMatch(/https?:\/\//);
+    expect(text).not.toContain("desk");
   });
 
-  it("builds a compact confirmed fallback without hex", () => {
+  it("builds compact confirmed fallback with same spent/received shape", () => {
     const text = buildCompactConfirmedReply({ ...base, status: "CONFIRMED" });
-    expect(text).toContain("spent 1 MON");
-    expect(text).toContain("MONEX");
+    expect(text).toContain("spent: 1 MON");
+    expect(text).toContain("received: 3935.98324 $MONEX");
     expect(text).not.toMatch(/0x[a-fA-F0-9]{6,}/);
     expect(
       isDuplicateXReplyError(

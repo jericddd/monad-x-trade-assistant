@@ -63,13 +63,23 @@ export function pickSuccessHeadline(seed: string): string {
 function tickerLabel(record: TradeRecord): string {
   const raw = (record.tokenSymbol ?? "").trim();
   if (!raw) return "TOKEN";
-  // Strip a leading $ if the symbol already includes it.
-  // Avoid cashtag form ($TICKER) — X often rejects automated crypto posts with cashtags.
+  // Strip a leading $ if the symbol already includes it; replies add $TICKER themselves.
   return raw.replace(/^\$+/, "").toUpperCase() || "TOKEN";
 }
 
 function sanitizeReply(text: string): string {
   return stripCryptoAddresses(stripUrls(text));
+}
+
+/** Confirmed buy reply — headline + spent/received only (no CA/tx; X bans hex for new auth). */
+function buildConfirmedBody(record: TradeRecord, headlineSeed: string): string {
+  const ticker = tickerLabel(record);
+  return [
+    pickSuccessHeadline(headlineSeed),
+    "",
+    `spent: ${record.requestedAmountMon} MON`,
+    `received: ${formatTokenAmount(record.expectedAmountOut)} $${ticker}`,
+  ].join("\n");
 }
 
 /**
@@ -94,10 +104,9 @@ export function buildTradeReply(
         "dry run successful",
         "",
         `would spend: ${record.requestedAmountMon} MON`,
-        `estimated tokens: ${formatTokenAmount(record.expectedAmountOut)} ${ticker}`,
-        `minimum tokens: ${formatTokenAmount(record.minimumAmountOut)} ${ticker}`,
+        `estimated tokens: ${formatTokenAmount(record.expectedAmountOut)} $${ticker}`,
+        `minimum tokens: ${formatTokenAmount(record.minimumAmountOut)} $${ticker}`,
         "no transaction was submitted",
-        "open the MonEx desk for the token address",
       ].join("\n");
       break;
 
@@ -107,13 +116,10 @@ export function buildTradeReply(
       break;
 
     case "confirmed":
-      text = [
-        pickSuccessHeadline(record.tweetId || record.txHash || record.tokenAddress),
-        "",
-        `spent: ${record.requestedAmountMon} MON`,
-        `received: ${formatTokenAmount(record.expectedAmountOut)} ${ticker}`,
-        "CA and tx are on your MonEx desk",
-      ].join("\n");
+      text = buildConfirmedBody(
+        record,
+        record.tweetId || record.txHash || record.tokenAddress,
+      );
       break;
 
     case "rejected":
@@ -147,18 +153,10 @@ export function buildTradeReply(
 }
 
 /**
- * Extra-short confirmed reply if the primary success text is still rejected.
+ * Fallback confirmed reply — same spent/received shape with a different headline seed.
  */
 export function buildCompactConfirmedReply(record: TradeRecord): string {
-  const ticker = tickerLabel(record);
-  return sanitizeReply(
-    [
-      pickSuccessHeadline(`${record.tweetId || ""}:compact`),
-      "",
-      `spent ${record.requestedAmountMon} MON for ${formatTokenAmount(record.expectedAmountOut)} ${ticker}`,
-      "details on your MonEx desk",
-    ].join("\n"),
-  );
+  return sanitizeReply(buildConfirmedBody(record, `${record.tweetId || ""}:compact`));
 }
 
 /** True when X rejected a post because an identical reply already exists. */
