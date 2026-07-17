@@ -218,7 +218,7 @@ export class AppTradeService {
       throw createTradeError("MINIMUM_RESERVE_VIOLATION", "need MON for gas");
     }
 
-      record = updateTradeRecord(record, { status: "SUBMITTING" });
+    record = updateTradeRecord(record, { status: "SUBMITTING" });
 
     try {
       const txHash = await executeNadfunSell({

@@ -8,7 +8,6 @@ import { buildBuyTransaction } from "./nadfun/build-buy.js";
 import { buildSellTransaction } from "./nadfun/build-sell.js";
 import { erc20Abi } from "./nadfun/abis/erc20.js";
 import { waitForReceipt } from "./receipts.js";
-import { waitForReceipt } from "./receipts.js";
 
 /** Require a local private-key account — never eth_signTransaction over RPC. */
 function requireLocalSigner(walletClient: WalletClient) {
