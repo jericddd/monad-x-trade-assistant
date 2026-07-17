@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTradeReply } from "../src/trading/replies.js";
+import { SUCCESS_HEADLINES, buildTradeReply, pickSuccessHeadline } from "../src/trading/replies.js";
 import type { TradeRecord } from "../src/trading/trade-record.js";
 
 const base: TradeRecord = {
@@ -12,6 +12,7 @@ const base: TradeRecord = {
   requestedAmountMon: "1",
   requestedAmountWei: "1000000000000000000",
   tokenAddress: "0x978Ae7298D48Cf0f8d1fdB26abC12bfACFcC7777",
+  tokenSymbol: "MONEX",
   walletAddress: "0x0000000000000000000000000000000000000001",
   expectedAmountOut: "3935983240000000000000",
   minimumAmountOut: "3817903742000000000000",
@@ -26,14 +27,24 @@ describe("buildTradeReply", () => {
     expect(buildTradeReply(base, "submitted")).toBe("");
   });
 
-  it("replies once with trade successful and full hashes", () => {
+  it("formats token as full CA / $TICKER", () => {
     const text = buildTradeReply({ ...base, status: "CONFIRMED" }, "confirmed");
-    expect(text.startsWith("trade successful")).toBe(true);
-    expect(text).toContain("spent: 1 MON");
-    expect(text).toContain(`token: ${base.tokenAddress}`);
+    expect(text).toContain("token: 0x978Ae7298D48Cf0f8d1fdB26abC12bfACFcC7777 / $MONEX");
+    expect(text).toContain("received: 3935.98324 $MONEX");
     expect(text).toContain(`tx: ${base.txHash}`);
     expect(text).not.toMatch(/https?:\/\//);
-    expect(text).not.toContain("…");
+  });
+
+  it("rotates across 5 success headlines", () => {
+    expect(SUCCESS_HEADLINES).toHaveLength(5);
+    const seen = new Set<string>();
+    for (let i = 0; i < 200; i++) {
+      seen.add(pickSuccessHeadline(String(i)));
+    }
+    expect(seen.size).toBe(5);
+    for (const h of SUCCESS_HEADLINES) {
+      expect(seen.has(h)).toBe(true);
+    }
   });
 
   it("uses trade failed wording for failures", () => {

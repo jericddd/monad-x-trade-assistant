@@ -22,10 +22,11 @@ import {
 } from "../trading/trade-record.js";
 import { TradeService } from "../trading/trade-service.js";
 import { buildTradeReply } from "../trading/replies.js";
+import { fetchTokenSymbol } from "../trading/token-meta.js";
 import { createProviders } from "../blockchain/nadfun/quote.js";
 import { createPublicBlockchainClient } from "../blockchain/client.js";
 import { getTransactionReceipt } from "../blockchain/receipts.js";
-import { parseEther } from "viem";
+import { getAddress, parseEther } from "viem";
 import { logInfo, logWarn } from "../utils/logging.js";
 import type { LinkedUserRecord } from "../custodial/types.js";
 import { resolveSignerForAuthor } from "../custodial/resolve-signer.js";
@@ -522,10 +523,23 @@ export class TradeCoordinator implements DurableObject {
       }
 
       if (receipt.status === "success") {
-        const updated = updateTradeRecord(record, {
+        let updated = updateTradeRecord(record, {
           status: "CONFIRMED",
           blockNumber: receipt.blockNumber.toString(),
         });
+        if (!updated.tokenSymbol) {
+          try {
+            const symbol = await fetchTokenSymbol(
+              publicClient,
+              getAddress(updated.tokenAddress) as `0x${string}`,
+            );
+            if (symbol) {
+              updated = updateTradeRecord(updated, { tokenSymbol: symbol });
+            }
+          } catch {
+            // Symbol is best-effort for reply formatting.
+          }
+        }
         await this.saveTradeRecord(updated);
         await this.removePendingSubmitted(tweetId);
         confirmed += 1;

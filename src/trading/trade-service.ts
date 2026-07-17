@@ -14,6 +14,8 @@ import { getNativeBalance, hasSufficientReserve } from "../blockchain/balances.j
 import { estimateBuyGas } from "../blockchain/gas.js";
 import { buildBuyTransaction } from "../blockchain/nadfun/build-buy.js";
 import { executeNadfunBuy } from "../blockchain/wallet.js";
+import { createPublicBlockchainClient } from "../blockchain/client.js";
+import { fetchTokenSymbol } from "./token-meta.js";
 
 export type TradeExecutionResult = {
   record: TradeRecord;
@@ -68,6 +70,18 @@ export class TradeService {
       });
 
     record = updateTradeRecord(record, { status: "VALIDATING" });
+
+    if (!record.tokenSymbol) {
+      try {
+        const publicClient = createPublicBlockchainClient(this.env);
+        const symbol = await fetchTokenSymbol(publicClient, input.command.tokenAddress);
+        if (symbol) {
+          record = updateTradeRecord(record, { tokenSymbol: symbol });
+        }
+      } catch {
+        // Symbol is best-effort for reply formatting.
+      }
+    }
 
     const quote = await this.quoteProvider.getBuyQuote({
       tokenAddress: input.command.tokenAddress,

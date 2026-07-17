@@ -31,9 +31,39 @@ export function stripUrls(text: string): string {
 
 export type ReplyKind = "dry_run" | "submitted" | "confirmed" | "rejected" | "failed" | "unknown";
 
+/** Rotate success openers so replies don’t look copy-pasted. */
+export const SUCCESS_HEADLINES = [
+  "trade successful",
+  "buy filled",
+  "order complete",
+  "trade landed",
+  "filled successfully",
+] as const;
+
+export function pickSuccessHeadline(seed: string): string {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  }
+  return SUCCESS_HEADLINES[hash % SUCCESS_HEADLINES.length]!;
+}
+
+function tickerLabel(record: TradeRecord): string {
+  const raw = (record.tokenSymbol ?? "").trim();
+  if (!raw) return "TOKEN";
+  // Strip a leading $ if the symbol already includes it.
+  return raw.replace(/^\$+/, "").toUpperCase() || "TOKEN";
+}
+
+function tokenLine(record: TradeRecord): string {
+  const ticker = tickerLabel(record);
+  // Full CA + mandatory " / $TICKER"
+  return `token: ${record.tokenAddress} / $${ticker}`;
+}
+
 /**
  * Build X reply text. Successful live trades only reply once after confirmation
- * ("trade successful") — callers must not post the submitted draft reply.
+ * — callers must not post the submitted draft reply.
  */
 export function buildTradeReply(
   record: TradeRecord,
@@ -41,8 +71,8 @@ export function buildTradeReply(
   _explorerBaseUrl?: string,
 ): string {
   void _explorerBaseUrl; // kept for call-site compatibility; links are never included
-  const tokenFull = record.tokenAddress;
   const txFull = record.txHash ?? "";
+  const ticker = tickerLabel(record);
 
   let text: string;
   switch (kind) {
@@ -51,8 +81,9 @@ export function buildTradeReply(
         "dry run successful",
         "",
         `would spend: ${record.requestedAmountMon} MON`,
-        `estimated tokens: ${formatTokenAmount(record.expectedAmountOut)}`,
-        `minimum tokens: ${formatTokenAmount(record.minimumAmountOut)}`,
+        `estimated tokens: ${formatTokenAmount(record.expectedAmountOut)} $${ticker}`,
+        `minimum tokens: ${formatTokenAmount(record.minimumAmountOut)} $${ticker}`,
+        tokenLine(record),
         "no transaction was submitted",
       ].join("\n");
       break;
@@ -64,11 +95,11 @@ export function buildTradeReply(
 
     case "confirmed":
       text = [
-        "trade successful",
+        pickSuccessHeadline(record.tweetId || record.txHash || record.tokenAddress),
         "",
         `spent: ${record.requestedAmountMon} MON`,
-        `received: ${formatTokenAmount(record.expectedAmountOut)} TOKEN`,
-        `token: ${tokenFull}`,
+        `received: ${formatTokenAmount(record.expectedAmountOut)} $${ticker}`,
+        tokenLine(record),
         txFull ? `tx: ${txFull}` : "",
       ]
         .filter(Boolean)
