@@ -17,6 +17,13 @@ describe("deriveInSiteWallet", () => {
     expect(a.address).toMatch(/^0x[a-fA-F0-9]{40}$/);
   });
 
+  it("changes address when wallet version renews", () => {
+    const v0 = deriveInSiteWallet(MASTER, "123", 0);
+    const v1 = deriveInSiteWallet(MASTER, "123", 1);
+    expect(v0.address).not.toBe(v1.address);
+    expect(deriveInSiteWallet(MASTER, "123", 1).address).toBe(v1.address);
+  });
+
   it("normalizes non-hex master seeds", () => {
     const seed = normalizeMasterSeed("some-long-secret-phrase!!");
     expect(seed).toMatch(/^0x[a-fA-F0-9]{64}$/);
@@ -32,6 +39,8 @@ describe("resolveSignerForAuthor", () => {
       xUsername: "alice",
       connectedWallet: "0x2222222222222222222222222222222222222222",
       inSiteWallet: deriveInSiteWallet(MASTER, "123").address,
+      walletVersion: 0,
+      privateKeyExportedAt: null,
       linkedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };

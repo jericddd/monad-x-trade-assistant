@@ -1,7 +1,9 @@
 import type { Hex } from "viem";
+import { getAddress } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import type { AppEnv } from "../env.js";
 import type { LinkedUserRecord } from "./types.js";
+import { normalizeLinkedUser } from "./types.js";
 import { deriveInSiteWallet, normalizeMasterSeed } from "./derive-wallet.js";
 
 export type ResolvedSigner = {
@@ -23,12 +25,20 @@ export function resolveSignerForAuthor(input: {
   const masterRaw = input.env.CUSTODIAL_MASTER_SEED ?? input.env.TRADE_WALLET_PRIVATE_KEY;
 
   if (input.user && masterRaw) {
-    const derived = deriveInSiteWallet(normalizeMasterSeed(masterRaw), input.authorId);
+    const user = normalizeLinkedUser(input.user);
+    const derived = deriveInSiteWallet(
+      normalizeMasterSeed(masterRaw),
+      input.authorId,
+      user.walletVersion,
+    );
+    if (getAddress(derived.address) !== getAddress(user.inSiteWallet)) {
+      return null;
+    }
     return {
       privateKey: derived.privateKey,
       walletAddress: derived.address,
       source: "in_site",
-      user: input.user,
+      user,
     };
   }
 

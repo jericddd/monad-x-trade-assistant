@@ -3,7 +3,14 @@ import type { Env } from "../worker.js";
 import { createPublicBlockchainClient, createWalletFromPrivateKey } from "../blockchain/client.js";
 import { getNativeBalance } from "../blockchain/balances.js";
 import { deriveInSiteWallet, normalizeMasterSeed } from "../custodial/derive-wallet.js";
-import type { LinkedUserRecord, WithdrawRequest } from "../custodial/types.js";
+import type {
+  ExportKeyRequest,
+  LinkedUserRecord,
+  PublicLinkedUser,
+  RenewWalletRequest,
+  WithdrawRequest,
+} from "../custodial/types.js";
+import { normalizeLinkedUser } from "../custodial/types.js";
 import { parseEnvLenient } from "../env.js";
 
 function unauthorized(): Response {
@@ -29,8 +36,9 @@ function registryStub(env: Env): DurableObjectStub {
 async function fetchLinkedUser(env: Env, xUserId: string): Promise<LinkedUserRecord | null> {
   const stub = registryStub(env);
   const res = await stub.fetch(`https://registry/get?xUserId=${encodeURIComponent(xUserId)}`);
-  const body = (await res.json()) as { user: LinkedUserRecord | null };
-  return body.user;
+  const body = (await res.json()) as { user: PublicLinkedUser | null };
+  if (!body.user) return null;
+  return normalizeLinkedUser(body.user);
 }
 
 export async function handleUsersApi(request: Request, env: Env): Promise<Response | null> {
@@ -49,6 +57,43 @@ export async function handleUsersApi(request: Request, env: Env): Promise<Respon
       method: "POST",
       headers: { "content-type": "application/json" },
       body: await request.text(),
+    });
+    const text = await upstream.text();
+    return new Response(text, {
+      status: upstream.status,
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  if (url.pathname === "/api/v1/users/export-key" && request.method === "POST") {
+    const body = (await request.json()) as ExportKeyRequest;
+    const stub = registryStub(env);
+    const upstream = await stub.fetch("https://registry/export-key", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ xUserId: body.xUserId }),
+    });
+    const text = await upstream.text();
+    return new Response(text, {
+      status: upstream.status,
+      headers: {
+        "content-type": "application/json",
+        // Never cache private key responses.
+        "cache-control": "no-store",
+      },
+    });
+  }
+
+  if (url.pathname === "/api/v1/users/renew-wallet" && request.method === "POST") {
+    const body = (await request.json()) as RenewWalletRequest;
+    const stub = registryStub(env);
+    const upstream = await stub.fetch("https://registry/renew-wallet", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        xUserId: body.xUserId,
+        confirmRenew: body.confirmRenew === true,
+      }),
     });
     const text = await upstream.text();
     return new Response(text, {
@@ -80,7 +125,10 @@ export async function handleUsersApi(request: Request, env: Env): Promise<Respon
     }
 
     return Response.json({
-      user,
+      user: {
+        ...user,
+        keyExportAvailable: !user.privateKeyExportedAt,
+      },
       balances: {
         inSiteMon: inSiteBalanceMon,
         connectedMon: connectedBalanceMon,
@@ -127,7 +175,11 @@ async function handleWithdraw(request: Request, env: Env): Promise<Response> {
     return badRequest("invalid_amount");
   }
 
-  const derived = deriveInSiteWallet(normalizeMasterSeed(masterRaw), body.xUserId);
+  const derived = deriveInSiteWallet(
+    normalizeMasterSeed(masterRaw),
+    body.xUserId,
+    user.walletVersion ?? 0,
+  );
   if (getAddress(derived.address) !== getAddress(user.inSiteWallet)) {
     return Response.json({ error: "wallet_mismatch" }, { status: 500 });
   }

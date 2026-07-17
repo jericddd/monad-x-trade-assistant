@@ -27,6 +27,13 @@ const ERC20_ABI = [
     inputs: [],
     outputs: [{ type: "string" }],
   },
+  {
+    type: "function",
+    name: "name",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "string" }],
+  },
 ] as const;
 
 export type PortfolioHolding = {
@@ -44,9 +51,12 @@ export type PortfolioHolding = {
 export type PortfolioTrade = {
   tweetId: string;
   tokenAddress: string;
+  tokenName: string;
+  tokenSymbol: string;
   amountMon: string;
   status: string;
   txHash?: string;
+  walletAddress: string;
   createdAt: string;
 };
 
@@ -167,14 +177,55 @@ export async function handlePortfolioApi(request: Request, env: Env): Promise<Re
 
   holdings.sort((a, b) => (a.lastAt && b.lastAt && a.lastAt < b.lastAt ? 1 : -1));
 
-  const recent: PortfolioTrade[] = trades.slice(0, 20).map((t) => ({
-    tweetId: t.tweetId,
-    tokenAddress: t.tokenAddress,
-    amountMon: t.requestedAmountMon,
-    status: t.status,
-    txHash: t.txHash,
-    createdAt: t.createdAt,
-  }));
+  const metaCache = new Map<string, { name: string; symbol: string }>();
+  try {
+    const publicClient = createPublicBlockchainClient(
+      parseEnvLenient(env as unknown as Record<string, unknown>),
+    );
+    const uniqueTokens = [...new Set(trades.slice(0, 20).map((t) => t.tokenAddress.toLowerCase()))];
+    await Promise.all(
+      uniqueTokens.map(async (token) => {
+        const tokenAddress = getAddress(token) as `0x${string}`;
+        try {
+          const [name, symbol] = await Promise.all([
+            publicClient.readContract({
+              address: tokenAddress,
+              abi: ERC20_ABI,
+              functionName: "name",
+            }),
+            publicClient.readContract({
+              address: tokenAddress,
+              abi: ERC20_ABI,
+              functionName: "symbol",
+            }),
+          ]);
+          metaCache.set(token, { name: String(name), symbol: String(symbol) });
+        } catch {
+          metaCache.set(token, {
+            name: shortSymbol(tokenAddress),
+            symbol: shortSymbol(tokenAddress),
+          });
+        }
+      }),
+    );
+  } catch {
+    // Metadata is best-effort.
+  }
+
+  const recent: PortfolioTrade[] = trades.slice(0, 20).map((t) => {
+    const meta = metaCache.get(t.tokenAddress.toLowerCase());
+    return {
+      tweetId: t.tweetId,
+      tokenAddress: t.tokenAddress,
+      tokenName: meta?.name ?? shortSymbol(t.tokenAddress),
+      tokenSymbol: meta?.symbol ?? shortSymbol(t.tokenAddress),
+      amountMon: t.requestedAmountMon,
+      status: t.status,
+      txHash: t.txHash,
+      walletAddress: t.walletAddress,
+      createdAt: t.createdAt,
+    };
+  });
 
   return Response.json({
     holdings,
