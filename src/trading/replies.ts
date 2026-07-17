@@ -1,6 +1,5 @@
 import { formatUnits } from "viem";
 import type { TradeRecord } from "./trade-record.js";
-import { shortenAddress } from "../utils/address.js";
 
 function formatTokenAmount(value: string | undefined): string {
   if (!value) {
@@ -26,6 +25,19 @@ export function stripUrls(text: string): string {
     .replace(/www\.\S+/gi, "")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/**
+ * Strip 0x hex payloads. X rejects tweets containing crypto addresses for the
+ * first 7 days after app authentication ("Crypto addresses are prohibited…").
+ */
+export function stripCryptoAddresses(text: string): string {
+  return text
+    .replace(/\b0x[a-fA-F0-9]{6,}\b/g, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]{2,}/g, " ")
     .trim();
 }
 
@@ -56,19 +68,16 @@ function tickerLabel(record: TradeRecord): string {
   return raw.replace(/^\$+/, "").toUpperCase() || "TOKEN";
 }
 
-function tokenLine(record: TradeRecord): string {
-  // Full CA only — ticker already appears on the received line.
-  return `token: ${record.tokenAddress}`;
-}
-
-function shortenTx(txHash: string): string {
-  if (txHash.length < 14) return txHash;
-  return `${txHash.slice(0, 10)}…${txHash.slice(-6)}`;
+function sanitizeReply(text: string): string {
+  return stripCryptoAddresses(stripUrls(text));
 }
 
 /**
  * Build X reply text. Successful live trades only reply once after confirmation
  * — callers must not post the submitted draft reply.
+ *
+ * Never include 0x addresses/hashes: new X app auth blocks crypto addresses
+ * for 7 days, and users can see CA/tx on the MonEx desk.
  */
 export function buildTradeReply(
   record: TradeRecord,
@@ -76,7 +85,6 @@ export function buildTradeReply(
   _explorerBaseUrl?: string,
 ): string {
   void _explorerBaseUrl; // kept for call-site compatibility; links are never included
-  const txFull = record.txHash ?? "";
   const ticker = tickerLabel(record);
 
   let text: string;
@@ -88,8 +96,8 @@ export function buildTradeReply(
         `would spend: ${record.requestedAmountMon} MON`,
         `estimated tokens: ${formatTokenAmount(record.expectedAmountOut)} ${ticker}`,
         `minimum tokens: ${formatTokenAmount(record.minimumAmountOut)} ${ticker}`,
-        tokenLine(record),
         "no transaction was submitted",
+        "open the MonEx desk for the token address",
       ].join("\n");
       break;
 
@@ -104,11 +112,8 @@ export function buildTradeReply(
         "",
         `spent: ${record.requestedAmountMon} MON`,
         `received: ${formatTokenAmount(record.expectedAmountOut)} ${ticker}`,
-        tokenLine(record),
-        txFull ? `tx: ${txFull}` : "",
-      ]
-        .filter(Boolean)
-        .join("\n");
+        "CA and tx are on your MonEx desk",
+      ].join("\n");
       break;
 
     case "rejected":
@@ -125,10 +130,7 @@ export function buildTradeReply(
         "",
         `reason: ${record.failureMessageSafe ?? "execution failed"}`,
         "safe to retry with a new post",
-        txFull ? `tx: ${txFull}` : "",
-      ]
-        .filter(Boolean)
-        .join("\n");
+      ].join("\n");
       break;
 
     case "unknown":
@@ -136,35 +138,26 @@ export function buildTradeReply(
         "trade status requires verification",
         "",
         "the network response was unclear after submission",
-        "check your trading wallet before retrying",
-        txFull ? `tx: ${txFull}` : `token: ${shortenAddress(record.tokenAddress)}`,
-      ]
-        .filter(Boolean)
-        .join("\n");
+        "check your trading wallet on the MonEx desk before retrying",
+      ].join("\n");
       break;
   }
 
-  return stripUrls(text);
+  return sanitizeReply(text);
 }
 
 /**
- * Compact success reply used when the full confirmed text is rejected by X
- * (spam filters on long hex / financial wording).
+ * Extra-short confirmed reply if the primary success text is still rejected.
  */
 export function buildCompactConfirmedReply(record: TradeRecord): string {
   const ticker = tickerLabel(record);
-  const tx = record.txHash ? shortenTx(record.txHash) : "";
-  return stripUrls(
+  return sanitizeReply(
     [
       pickSuccessHeadline(`${record.tweetId || ""}:compact`),
       "",
-      `spent: ${record.requestedAmountMon} MON`,
-      `received: ${formatTokenAmount(record.expectedAmountOut)} ${ticker}`,
-      `token: ${shortenAddress(record.tokenAddress)}`,
-      tx ? `tx: ${tx}` : "",
-    ]
-      .filter(Boolean)
-      .join("\n"),
+      `spent ${record.requestedAmountMon} MON for ${formatTokenAmount(record.expectedAmountOut)} ${ticker}`,
+      "details on your MonEx desk",
+    ].join("\n"),
   );
 }
 
@@ -175,5 +168,15 @@ export function isDuplicateXReplyError(message: string): boolean {
     lower.includes("duplicate") ||
     lower.includes("you already said that") ||
     lower.includes("status is a duplicate")
+  );
+}
+
+/** Permanent reply failures — stop retrying (tweet gone / not visible). */
+export function isPermanentXReplyError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("deleted") ||
+    lower.includes("not visible to you") ||
+    lower.includes("not found")
   );
 }

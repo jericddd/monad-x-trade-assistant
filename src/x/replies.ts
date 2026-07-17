@@ -1,15 +1,21 @@
 import type { AppEnv } from "../env.js";
 import type { XClient } from "./client.js";
 import { logError, logInfo } from "../utils/logging.js";
-import { isDuplicateXReplyError, stripUrls } from "../trading/replies.js";
+import {
+  isDuplicateXReplyError,
+  isPermanentXReplyError,
+  stripCryptoAddresses,
+  stripUrls,
+} from "../trading/replies.js";
 
 export async function replyToMention(
   client: XClient,
   tweetId: string,
   text: string,
 ): Promise<void> {
-  // Never post links — X charges heavily for URL replies.
-  await client.replyToTweet({ inReplyToTweetId: tweetId, text: stripUrls(text) });
+  // Never post links or 0x payloads — X blocks crypto addresses for new auth.
+  const sanitized = stripCryptoAddresses(stripUrls(text));
+  await client.replyToTweet({ inReplyToTweetId: tweetId, text: sanitized });
 }
 
 function errorMessage(error: unknown): string {
@@ -27,21 +33,21 @@ export async function replySafely(
     return true;
   } catch (error) {
     const message = errorMessage(error);
-    if (isDuplicateXReplyError(message)) {
-      logInfo("x_reply_duplicate_treated_as_sent", { tweetId, message });
+    if (isDuplicateXReplyError(message) || isPermanentXReplyError(message)) {
+      logInfo("x_reply_treated_as_sent", { tweetId, message });
       return true;
     }
 
     const compact = fallbackText?.trim();
-    if (compact && compact !== stripUrls(text)) {
+    if (compact && compact !== stripCryptoAddresses(stripUrls(text))) {
       try {
         await replyToMention(client, tweetId, compact);
         logInfo("x_reply_sent_compact_fallback", { tweetId });
         return true;
       } catch (fallbackError) {
         const fallbackMessage = errorMessage(fallbackError);
-        if (isDuplicateXReplyError(fallbackMessage)) {
-          logInfo("x_reply_duplicate_treated_as_sent", {
+        if (isDuplicateXReplyError(fallbackMessage) || isPermanentXReplyError(fallbackMessage)) {
+          logInfo("x_reply_treated_as_sent", {
             tweetId,
             message: fallbackMessage,
             via: "compact",

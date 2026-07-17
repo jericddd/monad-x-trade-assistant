@@ -4,7 +4,9 @@ import {
   buildCompactConfirmedReply,
   buildTradeReply,
   isDuplicateXReplyError,
+  isPermanentXReplyError,
   pickSuccessHeadline,
+  stripCryptoAddresses,
 } from "../src/trading/replies.js";
 import type { TradeRecord } from "../src/trading/trade-record.js";
 
@@ -33,28 +35,37 @@ describe("buildTradeReply", () => {
     expect(buildTradeReply(base, "submitted")).toBe("");
   });
 
-  it("formats token as full CA and ticker without cashtag on received", () => {
+  it("formats confirmed success without crypto addresses or cashtags", () => {
     const text = buildTradeReply({ ...base, status: "CONFIRMED" }, "confirmed");
-    expect(text).toContain("token: 0x978Ae7298D48Cf0f8d1fdB26abC12bfACFcC7777");
-    expect(text).not.toContain("/ $MONEX");
     expect(text).toContain("received: 3935.98324 MONEX");
+    expect(text).toContain("spent: 1 MON");
+    expect(text).toContain("MonEx desk");
     expect(text).not.toContain("$MONEX");
-    expect(text).toContain(`tx: ${base.txHash}`);
+    expect(text).not.toMatch(/0x[a-fA-F0-9]{6,}/);
     expect(text).not.toMatch(/https?:\/\//);
   });
 
-  it("builds a compact confirmed fallback without long hex strings", () => {
+  it("builds a compact confirmed fallback without hex", () => {
     const text = buildCompactConfirmedReply({ ...base, status: "CONFIRMED" });
-    expect(text).toContain("spent: 1 MON");
+    expect(text).toContain("spent 1 MON");
     expect(text).toContain("MONEX");
-    expect(text).not.toContain(base.tokenAddress);
-    expect(text).not.toContain(base.txHash);
-    expect(text).toMatch(/token: 0x978A\.\.\.7777/);
+    expect(text).not.toMatch(/0x[a-fA-F0-9]{6,}/);
     expect(
       isDuplicateXReplyError(
         "failed to reply on X: tweets request failed (403): Duplicate content.",
       ),
     ).toBe(true);
+    expect(
+      isPermanentXReplyError(
+        "failed to reply on X: tweets request failed (403): You attempted to reply to a Tweet that is deleted or not visible to you.",
+      ),
+    ).toBe(true);
+  });
+
+  it("strips crypto addresses from arbitrary text", () => {
+    expect(
+      stripCryptoAddresses(`token: ${base.tokenAddress}\ntx: ${base.txHash}\nok`),
+    ).toBe("token:\ntx:\nok");
   });
 
   it("rotates across 5 success headlines", () => {
@@ -76,5 +87,6 @@ describe("buildTradeReply", () => {
     );
     expect(text.startsWith("trade failed")).toBe(true);
     expect(text).toContain("reason: boom");
+    expect(text).not.toMatch(/0x[a-fA-F0-9]{6,}/);
   });
 });
