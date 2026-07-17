@@ -54,11 +54,11 @@ export const SUCCESS_HEADLINES = [
 
 /** Rotate site CTAs under received — no URLs (X charges for link replies). */
 export const SITE_FOOTERS = [
-  "visit the MonEx site to verify your txn",
-  "check the MonEx desk to confirm this trade",
-  "open MonEx to review your transaction",
-  "verify this buy on the MonEx site",
-  "see full txn details on MonEx",
+  "visit the site to verify your txn",
+  "check the desk to confirm this trade",
+  "open the site to review your transaction",
+  "verify this buy on the site",
+  "see full txn details on the site",
 ] as const;
 
 function pickRotating<T extends readonly string[]>(options: T, seed: string, salt = 0): T[number] {
