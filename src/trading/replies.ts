@@ -135,10 +135,7 @@ export function buildTradeReply(
       break;
 
     case "confirmed":
-      text = buildConfirmedBody(
-        record,
-        record.tweetId || record.txHash || record.tokenAddress,
-      );
+      text = buildConfirmedBody(record, record.tweetId || record.txHash || record.tokenAddress);
       break;
 
     case "rejected":
@@ -192,8 +189,6 @@ export function isDuplicateXReplyError(message: string): boolean {
 export function isPermanentXReplyError(message: string): boolean {
   const lower = message.toLowerCase();
   return (
-    lower.includes("deleted") ||
-    lower.includes("not visible to you") ||
-    lower.includes("not found")
+    lower.includes("deleted") || lower.includes("not visible to you") || lower.includes("not found")
   );
 }

@@ -42,13 +42,7 @@ describe("buildTradeReply", () => {
     const headline = pickSuccessHeadline(base.tweetId);
     const footer = pickSiteFooter(base.tweetId);
     expect(text).toBe(
-      [
-        headline,
-        "",
-        "spent: 1 MON",
-        "received: 3935.98324 $MONEX",
-        footer,
-      ].join("\n"),
+      [headline, "", "spent: 1 MON", "received: 3935.98324 $MONEX", footer].join("\n"),
     );
     expect(SITE_FOOTERS).toContain(footer);
     expect(text).not.toMatch(/0x[a-fA-F0-9]{6,}/);
@@ -74,9 +68,9 @@ describe("buildTradeReply", () => {
   });
 
   it("strips crypto addresses from arbitrary text", () => {
-    expect(
-      stripCryptoAddresses(`token: ${base.tokenAddress}\ntx: ${base.txHash}\nok`),
-    ).toBe("token:\ntx:\nok");
+    expect(stripCryptoAddresses(`token: ${base.tokenAddress}\ntx: ${base.txHash}\nok`)).toBe(
+      "token:\ntx:\nok",
+    );
   });
 
   it("rotates across 5 success headlines and 5 site footers", () => {

@@ -13,7 +13,7 @@ describe("healthResponse", () => {
       AUTHORIZED_X_USER_ID: "123",
       MONAD_RPC_URL: "https://rpc.monad.xyz",
       SITE_API_SECRET: "site-secret-at-least-16",
-    });
+    } as Record<string, unknown>);
     const body = (await res.json()) as {
       tradingEnabled: boolean;
       dryRun: boolean;
@@ -31,7 +31,7 @@ describe("healthResponse", () => {
     const res = healthResponse({
       TRADING_ENABLED: true,
       TRADE_DRY_RUN: false,
-    });
+    } as Record<string, unknown>);
     const body = (await res.json()) as { config: { xOAuthConfigured: boolean }; live: boolean };
     expect(body.config.xOAuthConfigured).toBe(false);
     expect(body.live).toBe(true);

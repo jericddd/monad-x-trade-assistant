@@ -4,9 +4,9 @@ Buy Nad.fun tokens on **Monad mainnet** by mentioning [@monexmonad](https://x.co
 
 **This is the only product repo** (worker + web desk).
 
-| Piece | URL |
-|-------|-----|
-| Desk | [https://trade.monexmonad.xyz](https://trade.monexmonad.xyz) |
+| Piece         | URL                                                                                                                        |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Desk          | [https://trade.monexmonad.xyz](https://trade.monexmonad.xyz)                                                               |
 | Worker health | [https://monad-x-trade-assistant.0xjericd.workers.dev/health](https://monad-x-trade-assistant.0xjericd.workers.dev/health) |
 
 > Live trading spends real MON. Use limited funds only.
@@ -22,11 +22,11 @@ Buy Nad.fun tokens on **Monad mainnet** by mentioning [@monexmonad](https://x.co
 
 ## What it does
 
-1. Sign in with X on the desk → link a browser wallet → fund an in-site trading wallet  
-2. Post on X: `@monexmonad buy <amount> mon <tokenAddress>`  
-3. Worker quotes Nad.fun, simulates, signs locally, broadcasts on Monad  
-4. Bot replies once after confirmation (spent / received — no URLs or `0x` hex)  
-5. Desk shows live portfolio, activity, add-funds / cash-out, and buy/sell for held tokens  
+1. Sign in with X on the desk → link a browser wallet → fund an in-site trading wallet
+2. Post on X: `@monexmonad buy <amount> mon <tokenAddress>`
+3. Worker quotes Nad.fun, simulates, signs locally, broadcasts on Monad
+4. Bot replies once after confirmation (spent / received — no URLs or `0x` hex)
+5. Desk shows live portfolio, activity, add-funds / cash-out, and buy/sell for held tokens
 
 ## Command format
 
@@ -87,8 +87,8 @@ Set Worker `TRADING_ENABLED=false` (and preferably `TRADE_DRY_RUN=true`), then `
 
 ## Demo checklist
 
-1. Open [trade.monexmonad.xyz](https://trade.monexmonad.xyz) → Continue with X → link wallet → add funds  
-2. Post a small buy on X to `@monexmonad`  
-3. Show bot reply + desk Activity / Portfolio (explorer tx on Activity)  
+1. Open [trade.monexmonad.xyz](https://trade.monexmonad.xyz) → Continue with X → link wallet → add funds
+2. Post a small buy on X to `@monexmonad`
+3. Show bot reply + desk Activity / Portfolio (explorer tx on Activity)
 
 Add demo video: `<!-- DEMO_VIDEO_URL -->`
