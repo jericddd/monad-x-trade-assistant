@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  SITE_FOOTERS,
   SUCCESS_HEADLINES,
   buildCompactConfirmedReply,
   buildTradeReply,
   isDuplicateXReplyError,
   isPermanentXReplyError,
+  pickSiteFooter,
   pickSuccessHeadline,
   stripCryptoAddresses,
 } from "../src/trading/replies.js";
@@ -35,21 +37,29 @@ describe("buildTradeReply", () => {
     expect(buildTradeReply(base, "submitted")).toBe("");
   });
 
-  it("formats confirmed success as headline + spent + received $TICKER only", () => {
+  it("formats confirmed success with rotating site verify line under received", () => {
     const text = buildTradeReply({ ...base, status: "CONFIRMED" }, "confirmed");
     const headline = pickSuccessHeadline(base.tweetId);
+    const footer = pickSiteFooter(base.tweetId);
     expect(text).toBe(
-      [headline, "", "spent: 1 MON", "received: 3935.98324 $MONEX"].join("\n"),
+      [
+        headline,
+        "",
+        "spent: 1 MON",
+        "received: 3935.98324 $MONEX",
+        footer,
+      ].join("\n"),
     );
+    expect(SITE_FOOTERS).toContain(footer);
     expect(text).not.toMatch(/0x[a-fA-F0-9]{6,}/);
     expect(text).not.toMatch(/https?:\/\//);
-    expect(text).not.toContain("desk");
   });
 
   it("builds compact confirmed fallback with same spent/received shape", () => {
     const text = buildCompactConfirmedReply({ ...base, status: "CONFIRMED" });
     expect(text).toContain("spent: 1 MON");
     expect(text).toContain("received: 3935.98324 $MONEX");
+    expect(SITE_FOOTERS.some((line) => text.includes(line))).toBe(true);
     expect(text).not.toMatch(/0x[a-fA-F0-9]{6,}/);
     expect(
       isDuplicateXReplyError(
@@ -69,15 +79,22 @@ describe("buildTradeReply", () => {
     ).toBe("token:\ntx:\nok");
   });
 
-  it("rotates across 5 success headlines", () => {
+  it("rotates across 5 success headlines and 5 site footers", () => {
     expect(SUCCESS_HEADLINES).toHaveLength(5);
-    const seen = new Set<string>();
+    expect(SITE_FOOTERS).toHaveLength(5);
+    const headlines = new Set<string>();
+    const footers = new Set<string>();
     for (let i = 0; i < 200; i++) {
-      seen.add(pickSuccessHeadline(String(i)));
+      headlines.add(pickSuccessHeadline(String(i)));
+      footers.add(pickSiteFooter(String(i)));
     }
-    expect(seen.size).toBe(5);
+    expect(headlines.size).toBe(5);
+    expect(footers.size).toBe(5);
     for (const h of SUCCESS_HEADLINES) {
-      expect(seen.has(h)).toBe(true);
+      expect(headlines.has(h)).toBe(true);
+    }
+    for (const f of SITE_FOOTERS) {
+      expect(footers.has(f)).toBe(true);
     }
   });
 

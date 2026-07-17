@@ -52,12 +52,30 @@ export const SUCCESS_HEADLINES = [
   "filled successfully",
 ] as const;
 
-export function pickSuccessHeadline(seed: string): string {
-  let hash = 0;
+/** Rotate site CTAs under received — no URLs (X charges for link replies). */
+export const SITE_FOOTERS = [
+  "visit the MonEx site to verify your txn",
+  "check the MonEx desk to confirm this trade",
+  "open MonEx to review your transaction",
+  "verify this buy on the MonEx site",
+  "see full txn details on MonEx",
+] as const;
+
+function pickRotating<T extends readonly string[]>(options: T, seed: string, salt = 0): T[number] {
+  let hash = salt >>> 0;
   for (let i = 0; i < seed.length; i++) {
     hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
   }
-  return SUCCESS_HEADLINES[hash % SUCCESS_HEADLINES.length]!;
+  return options[hash % options.length]!;
+}
+
+export function pickSuccessHeadline(seed: string): string {
+  return pickRotating(SUCCESS_HEADLINES, seed);
+}
+
+export function pickSiteFooter(seed: string): string {
+  // Different salt so footer rotation is independent of the headline.
+  return pickRotating(SITE_FOOTERS, seed, 0x9e3779b9);
 }
 
 function tickerLabel(record: TradeRecord): string {
@@ -71,7 +89,7 @@ function sanitizeReply(text: string): string {
   return stripCryptoAddresses(stripUrls(text));
 }
 
-/** Confirmed buy reply — headline + spent/received only (no CA/tx; X bans hex for new auth). */
+/** Confirmed buy reply — headline + spent/received + rotating site verify line. */
 function buildConfirmedBody(record: TradeRecord, headlineSeed: string): string {
   const ticker = tickerLabel(record);
   return [
@@ -79,6 +97,7 @@ function buildConfirmedBody(record: TradeRecord, headlineSeed: string): string {
     "",
     `spent: ${record.requestedAmountMon} MON`,
     `received: ${formatTokenAmount(record.expectedAmountOut)} $${ticker}`,
+    pickSiteFooter(headlineSeed),
   ].join("\n");
 }
 
