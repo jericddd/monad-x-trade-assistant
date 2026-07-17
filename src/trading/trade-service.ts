@@ -272,6 +272,22 @@ export class TradeService {
         };
       }
 
+      if (receipt?.status === "reverted") {
+        record = updateTradeRecord(record, {
+          status: "FAILED",
+          failureCode: "SUBMISSION_FAILED",
+          failureMessageSafe: "buy reverted on-chain",
+          txHash,
+        });
+        return {
+          record,
+          replyKind: "failed",
+          replyText: buildTradeReply(record, "failed", this.env.MONAD_EXPLORER_TX_URL),
+          reservedAmountWei: input.amountInWei,
+          committedAmountWei: input.amountInWei,
+        };
+      }
+
       // Receipt not ready yet — confirm cron will post "trade successful" later.
       return {
         record,

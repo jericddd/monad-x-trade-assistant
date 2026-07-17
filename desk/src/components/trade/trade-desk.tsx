@@ -210,7 +210,8 @@ function formatActivityWhen(iso: string): string {
 
 function hasPositiveBalance(value: string | null | undefined): boolean {
   const n = Number(value);
-  return Number.isFinite(n) && n > 0;
+  // Ignore dust left after 100% sells / rounding.
+  return Number.isFinite(n) && n > 1e-8;
 }
 
 /** Leave 1 MON for gas when using Max on add funds / cash out / buy. */
@@ -669,11 +670,44 @@ export function TradeDesk() {
         message?: string;
       };
       if (!res.ok || data.ok === false) {
-        throw new Error(data.message ?? data.error ?? "Trade failed");
+        const err = data.message ?? data.error ?? "Trade failed";
+        if (data.txHash) {
+          setTxUrl(getExplorerTxUrl(data.txHash));
+        }
+        throw new Error(err);
+      }
+
+      const confirmed =
+        data.dryRun ||
+        data.status === "DRY_RUN_SUCCESS" ||
+        data.status === "CONFIRMED";
+      if (!confirmed) {
+        throw new Error(
+          data.status === "SUBMITTED"
+            ? "Trade submitted but not confirmed yet — check Activity / explorer"
+            : `Trade not confirmed (${data.status ?? "unknown"})`,
+        );
       }
 
       const ticker = (data.tokenSymbol ?? symbol ?? "TOKEN").replace(/^\$/, "");
       const explorerUrl = data.txHash ? getExplorerTxUrl(data.txHash) : null;
+
+      // Optimistic portfolio update so a full sell disappears immediately.
+      if (action === "sell") {
+        const token = tradeModal.tokenAddress.toLowerCase();
+        setHoldings((prev) =>
+          prev
+            .map((h) => {
+              if (h.tokenAddress.toLowerCase() !== token) return h;
+              if (percent >= 100) return { ...h, balance: "0" };
+              const bal = Number(h.balance);
+              if (!Number.isFinite(bal)) return h;
+              return { ...h, balance: String(Math.max(0, bal * (1 - percent / 100))) };
+            })
+            .filter((h) => hasPositiveBalance(h.balance)),
+        );
+      }
+
       setTradeModal(null);
       setTradeSuccess({
         action,
@@ -691,7 +725,10 @@ export function TradeDesk() {
       setTxUrl(explorerUrl);
       await refreshAccount({ silent: true });
       await refreshPortfolio(activityPage, { silent: true });
-    } catch (error) {
+      // Chain balance can lag briefly after confirm — refresh again shortly.
+      window.setTimeout(() => {
+        void refreshPortfolio(activityPage, { silent: true });
+      }, 4000);    } catch (error) {
       setStatus(error instanceof Error ? error.message : "Trade failed");
     } finally {
       setTradeBusy(false);

@@ -7,6 +7,8 @@ import { createSubmissionError } from "../trading/submission-error.js";
 import { buildBuyTransaction } from "./nadfun/build-buy.js";
 import { buildSellTransaction } from "./nadfun/build-sell.js";
 import { erc20Abi } from "./nadfun/abis/erc20.js";
+import { waitForReceipt } from "./receipts.js";
+import { waitForReceipt } from "./receipts.js";
 
 /** Require a local private-key account — never eth_signTransaction over RPC. */
 function requireLocalSigner(walletClient: WalletClient) {
@@ -206,6 +208,7 @@ export async function executeNadfunBuy(input: {
 /**
  * Sell tokens for MON on allowlisted Nad.fun routers.
  * Approves the router when allowance is insufficient, then submits sell.
+ * Waits for receipts so callers never treat a reverted sell as success.
  */
 export async function executeNadfunSell(input: {
   publicClient: PublicClient;
@@ -224,6 +227,7 @@ export async function executeNadfunSell(input: {
     throw createTradeError("ROUTER_NOT_ALLOWED");
   }
 
+  // Modest bump over network gas price — not a high custom fee.
   const gasPrice = input.gasPrice != null ? (input.gasPrice * 112n) / 100n : undefined;
 
   const allowance = (await input.publicClient.readContract({
@@ -249,9 +253,18 @@ export async function executeNadfunSell(input: {
       gas: 80_000n,
       gasPrice,
     });
-    // Wait until the approve is visible so the sell nonce/allowance are ready.
-    await waitForTxVisible(input.publicClient, approveHash, 12_000);
-    await sleep(800);
+    const approveReceipt = await waitForReceipt(input.publicClient, approveHash, 25_000);
+    if (!approveReceipt) {
+      throw createSubmissionError(
+        "SUBMISSION_UNKNOWN",
+        "approve not confirmed yet — check trading wallet before retrying",
+        approveHash,
+      );
+    }
+    if (approveReceipt.status !== "success") {
+      throw createSubmissionError("SUBMISSION_FAILED", "token approve reverted", approveHash);
+    }
+    await sleep(400);
   }
 
   const data = buildSellTransaction({
@@ -263,16 +276,51 @@ export async function executeNadfunSell(input: {
     routerAddress: input.routerAddress,
   });
 
-  return signAndBroadcast({
+  // V2 sells often need >300k; estimate with buffer, floor at 450k so we don't OOG.
+  let gas = input.gas;
+  if (gas == null) {
+    try {
+      const estimated = await input.publicClient.estimateGas({
+        account: input.walletAddress,
+        to: input.routerAddress,
+        data,
+        value: 0n,
+      });
+      const padded = (estimated * 130n) / 100n;
+      gas = padded > 450_000n ? padded : 450_000n;
+    } catch {
+      gas = 550_000n;
+    }
+  }
+
+  const txHash = await signAndBroadcast({
     publicClient: input.publicClient,
     walletClient: input.walletClient,
     walletAddress: input.walletAddress,
     to: input.routerAddress,
     data,
     value: 0n,
-    gas: input.gas,
+    gas,
     gasPrice,
   });
+
+  const receipt = await waitForReceipt(input.publicClient, txHash, 45_000);
+  if (!receipt) {
+    throw createSubmissionError(
+      "SUBMISSION_UNKNOWN",
+      "sell broadcast but not confirmed yet — check trading wallet before retrying",
+      txHash,
+    );
+  }
+  if (receipt.status !== "success") {
+    throw createSubmissionError(
+      "SUBMISSION_FAILED",
+      "sell reverted on-chain — no tokens moved",
+      txHash,
+    );
+  }
+
+  return txHash;
 }
 
 export function getTradeWalletAddress(privateKey: string): `0x${string}` {

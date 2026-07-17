@@ -10,6 +10,7 @@ import {
 import { parseEnvLenient } from "../env.js";
 import { AppTradeService } from "../trading/app-trade-service.js";
 import { TradeError } from "../trading/errors.js";
+import { isSubmissionTradeError } from "../trading/submission-error.js";
 import type { TradeRecord } from "../trading/trade-record.js";
 import { assertSiteSecret } from "./api-users.js";
 
@@ -182,7 +183,11 @@ export async function handleTradeApi(request: Request, env: Env): Promise<Respon
   } catch (error) {
     if (error instanceof TradeError) {
       return Response.json(
-        { error: error.code.toLowerCase(), message: error.safeMessage },
+        {
+          error: error.code.toLowerCase(),
+          message: error.safeMessage,
+          txHash: isSubmissionTradeError(error) ? (error.txHash ?? null) : null,
+        },
         { status: 400 },
       );
     }
