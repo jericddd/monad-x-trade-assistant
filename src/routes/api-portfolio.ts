@@ -47,6 +47,7 @@ export type PortfolioTrade = {
   amountMon: string;
   status: string;
   txHash?: string;
+  walletAddress: string;
   createdAt: string;
 };
 
@@ -173,6 +174,7 @@ export async function handlePortfolioApi(request: Request, env: Env): Promise<Re
     amountMon: t.requestedAmountMon,
     status: t.status,
     txHash: t.txHash,
+    walletAddress: t.walletAddress,
     createdAt: t.createdAt,
   }));
 
