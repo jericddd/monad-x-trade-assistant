@@ -1,7 +1,14 @@
 import { getAddress, isAddress } from "viem";
 import { parseEnvLenient, type AppEnv } from "../env.js";
 import { deriveInSiteWallet, normalizeMasterSeed } from "../custodial/derive-wallet.js";
-import type { LinkUserRequest, LinkedUserRecord } from "../custodial/types.js";
+import {
+  normalizeLinkedUser,
+  toPublicLinkedUser,
+  type ExportKeyRequest,
+  type LinkUserRequest,
+  type LinkedUserRecord,
+  type RenewWalletRequest,
+} from "../custodial/types.js";
 
 const USER_KEY_PREFIX = "user:x:";
 
@@ -36,17 +43,46 @@ export class UserRegistry implements DurableObject {
         return Response.json({ error: "invalid_x_user_id" }, { status: 400 });
       }
       const user = await this.getUser(xUserId);
-      return Response.json({ user });
+      return Response.json({ user: user ? toPublicLinkedUser(user) : null });
     }
 
     if (url.pathname === "/link" && request.method === "POST") {
       const body = (await request.json()) as LinkUserRequest;
       try {
         const user = await this.linkUser(body);
-        return Response.json({ user });
+        return Response.json({ user: toPublicLinkedUser(user) });
       } catch (error) {
         const message = error instanceof Error ? error.message : "link_failed";
         return Response.json({ error: message }, { status: 400 });
+      }
+    }
+
+    if (url.pathname === "/export-key" && request.method === "POST") {
+      const body = (await request.json()) as ExportKeyRequest;
+      try {
+        const result = await this.exportPrivateKey(body.xUserId);
+        return Response.json(result);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "export_failed";
+        const status =
+          message === "already_exported" || message === "user_not_linked"
+            ? message === "user_not_linked"
+              ? 404
+              : 409
+            : 400;
+        return Response.json({ error: message }, { status });
+      }
+    }
+
+    if (url.pathname === "/renew-wallet" && request.method === "POST") {
+      const body = (await request.json()) as RenewWalletRequest;
+      try {
+        const result = await this.renewWallet(body);
+        return Response.json(result);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "renew_failed";
+        const status = message === "user_not_linked" ? 404 : 400;
+        return Response.json({ error: message }, { status });
       }
     }
 
@@ -60,7 +96,7 @@ export class UserRegistry implements DurableObject {
       const authorized = Boolean(user) || (Boolean(bootstrapId) && xUserId === bootstrapId);
       return Response.json({
         authorized,
-        user,
+        user: user ? toPublicLinkedUser(user) : null,
         bootstrap: Boolean(bootstrapId) && xUserId === bootstrapId && !user,
       });
     }
@@ -69,7 +105,16 @@ export class UserRegistry implements DurableObject {
   }
 
   async getUser(xUserId: string): Promise<LinkedUserRecord | null> {
-    return (await this.state.storage.get<LinkedUserRecord>(userKey(xUserId))) ?? null;
+    const raw = await this.state.storage.get<LinkedUserRecord>(userKey(xUserId));
+    return raw ? normalizeLinkedUser(raw) : null;
+  }
+
+  private masterSeedRaw(): string {
+    const masterRaw = this.env.CUSTODIAL_MASTER_SEED ?? this.env.TRADE_WALLET_PRIVATE_KEY;
+    if (!masterRaw) {
+      throw new Error("custodial_master_seed_missing");
+    }
+    return masterRaw;
   }
 
   async linkUser(input: LinkUserRequest): Promise<LinkedUserRecord> {
@@ -83,28 +128,113 @@ export class UserRegistry implements DurableObject {
       throw new Error("invalid_connected_wallet");
     }
 
-    const masterRaw = this.env.CUSTODIAL_MASTER_SEED ?? this.env.TRADE_WALLET_PRIVATE_KEY;
-    if (!masterRaw) {
-      throw new Error("custodial_master_seed_missing");
-    }
-
-    const { address: inSiteWallet } = deriveInSiteWallet(
-      normalizeMasterSeed(masterRaw),
+    const existing = await this.getUser(input.xUserId);
+    const walletVersion = existing?.walletVersion ?? 0;
+    const { address: derivedAddress } = deriveInSiteWallet(
+      normalizeMasterSeed(this.masterSeedRaw()),
       input.xUserId,
+      walletVersion,
     );
     const now = new Date().toISOString();
-    const existing = await this.getUser(input.xUserId);
     const record: LinkedUserRecord = {
       xUserId: input.xUserId,
       xUsername: input.xUsername.trim().replace(/^@/, ""),
       connectedWallet: getAddress(input.connectedWallet) as `0x${string}`,
-      inSiteWallet,
+      // Preserve renewed wallets; only assign on first link.
+      inSiteWallet: existing?.inSiteWallet ?? derivedAddress,
+      walletVersion,
+      privateKeyExportedAt: existing?.privateKeyExportedAt ?? null,
       linkedAt: existing?.linkedAt ?? now,
       updatedAt: now,
     };
 
     await this.state.storage.put(userKey(input.xUserId), record);
     return record;
+  }
+
+  /**
+   * One-time private key reveal for the current in-site wallet version.
+   * After this, the key is never returned again for this version (export burned).
+   * Signing for buys still derives on demand — only display/export is burned.
+   */
+  async exportPrivateKey(xUserId: string): Promise<{
+    privateKey: `0x${string}`;
+    address: `0x${string}`;
+    walletVersion: number;
+    exportedAt: string;
+    user: ReturnType<typeof toPublicLinkedUser>;
+  }> {
+    if (!xUserId || !/^\d+$/.test(xUserId)) {
+      throw new Error("invalid_x_user_id");
+    }
+    const user = await this.getUser(xUserId);
+    if (!user) throw new Error("user_not_linked");
+    if (user.privateKeyExportedAt) throw new Error("already_exported");
+
+    const derived = deriveInSiteWallet(
+      normalizeMasterSeed(this.masterSeedRaw()),
+      xUserId,
+      user.walletVersion,
+    );
+    if (getAddress(derived.address) !== getAddress(user.inSiteWallet)) {
+      throw new Error("wallet_mismatch");
+    }
+
+    const exportedAt = new Date().toISOString();
+    const updated: LinkedUserRecord = {
+      ...user,
+      privateKeyExportedAt: exportedAt,
+      updatedAt: exportedAt,
+    };
+    await this.state.storage.put(userKey(xUserId), updated);
+
+    return {
+      privateKey: derived.privateKey,
+      address: derived.address,
+      walletVersion: user.walletVersion,
+      exportedAt,
+      user: toPublicLinkedUser(updated),
+    };
+  }
+
+  async renewWallet(input: RenewWalletRequest): Promise<{
+    user: ReturnType<typeof toPublicLinkedUser>;
+    previousInSiteWallet: `0x${string}`;
+    warning: string;
+  }> {
+    if (!input.xUserId || !/^\d+$/.test(input.xUserId)) {
+      throw new Error("invalid_x_user_id");
+    }
+    if (input.confirmRenew !== true) {
+      throw new Error("confirm_renew_required");
+    }
+
+    const user = await this.getUser(input.xUserId);
+    if (!user) throw new Error("user_not_linked");
+
+    const previousInSiteWallet = user.inSiteWallet;
+    const nextVersion = user.walletVersion + 1;
+    const { address: inSiteWallet } = deriveInSiteWallet(
+      normalizeMasterSeed(this.masterSeedRaw()),
+      input.xUserId,
+      nextVersion,
+    );
+    const now = new Date().toISOString();
+    const updated: LinkedUserRecord = {
+      ...user,
+      inSiteWallet,
+      walletVersion: nextVersion,
+      privateKeyExportedAt: null,
+      updatedAt: now,
+    };
+    await this.state.storage.put(userKey(input.xUserId), updated);
+
+    return {
+      user: toPublicLinkedUser(updated),
+      previousInSiteWallet,
+      warning:
+        "Move all funds out of the previous trading wallet before renewing. Funds left behind stay on the old address.",
+    };
   }
 }
 
