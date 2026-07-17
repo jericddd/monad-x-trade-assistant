@@ -426,6 +426,16 @@ export class TradeCoordinator implements DurableObject {
         await this.addPendingSubmitted(result.record.tweetId);
       }
 
+      // If we already confirmed in-process, keep pending until the X reply is marked sent
+      // so a failed reply can be retried on the next confirm pass.
+      if (
+        result.record.status === "CONFIRMED" &&
+        result.record.lastReplyStatus !== "CONFIRMED" &&
+        result.replyText
+      ) {
+        await this.addPendingSubmitted(result.record.tweetId);
+      }
+
       logInfo("trade_processed", {
         tweetId: result.record.tweetId,
         status: result.record.status,
@@ -435,7 +445,10 @@ export class TradeCoordinator implements DurableObject {
       });
 
       return {
-        ok: result.record.status === "DRY_RUN_SUCCESS" || result.record.status === "SUBMITTED",
+        ok:
+          result.record.status === "DRY_RUN_SUCCESS" ||
+          result.record.status === "SUBMITTED" ||
+          result.record.status === "CONFIRMED",
         replyText: result.replyText,
         status: result.record.status,
         failureCode: result.record.failureCode as TradeErrorCode | undefined,
@@ -511,6 +524,33 @@ export class TradeCoordinator implements DurableObject {
         continue;
       }
 
+      // Retry success replies that were confirmed but never posted on X.
+      if (record.status === "CONFIRMED") {
+        if (record.lastReplyStatus === "CONFIRMED") {
+          await this.removePendingSubmitted(tweetId);
+        } else {
+          replies.push({
+            tweetId,
+            replyText: buildTradeReply(record, "confirmed", this.env.MONAD_EXPLORER_TX_URL),
+            status: "CONFIRMED",
+          });
+        }
+        continue;
+      }
+
+      if (record.status === "FAILED" || record.status === "REJECTED") {
+        if (record.status === "FAILED" && record.lastReplyStatus !== "FAILED" && record.txHash) {
+          replies.push({
+            tweetId,
+            replyText: buildTradeReply(record, "failed", this.env.MONAD_EXPLORER_TX_URL),
+            status: "FAILED",
+          });
+        } else {
+          await this.removePendingSubmitted(tweetId);
+        }
+        continue;
+      }
+
       if (record.status !== "SUBMITTED" && record.status !== "UNKNOWN") {
         await this.removePendingSubmitted(tweetId);
         continue;
@@ -541,15 +581,17 @@ export class TradeCoordinator implements DurableObject {
           }
         }
         await this.saveTradeRecord(updated);
-        await this.removePendingSubmitted(tweetId);
         confirmed += 1;
 
+        // Keep on pending until mark-replied so a failed X post can retry.
         if (updated.lastReplyStatus !== "CONFIRMED") {
           replies.push({
             tweetId,
             replyText: buildTradeReply(updated, "confirmed", this.env.MONAD_EXPLORER_TX_URL),
             status: "CONFIRMED",
           });
+        } else {
+          await this.removePendingSubmitted(tweetId);
         }
       } else {
         const updated = updateTradeRecord(record, {
@@ -559,7 +601,6 @@ export class TradeCoordinator implements DurableObject {
           blockNumber: receipt.blockNumber.toString(),
         });
         await this.saveTradeRecord(updated);
-        await this.removePendingSubmitted(tweetId);
         reverted += 1;
 
         if (updated.lastReplyStatus !== "FAILED") {
@@ -568,6 +609,8 @@ export class TradeCoordinator implements DurableObject {
             replyText: buildTradeReply(updated, "failed", this.env.MONAD_EXPLORER_TX_URL),
             status: "FAILED",
           });
+        } else {
+          await this.removePendingSubmitted(tweetId);
         }
       }
     }

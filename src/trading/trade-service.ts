@@ -15,6 +15,7 @@ import { estimateBuyGas } from "../blockchain/gas.js";
 import { buildBuyTransaction } from "../blockchain/nadfun/build-buy.js";
 import { executeNadfunBuy } from "../blockchain/wallet.js";
 import { createPublicBlockchainClient } from "../blockchain/client.js";
+import { waitForReceipt } from "../blockchain/receipts.js";
 import { fetchTokenSymbol } from "./token-meta.js";
 
 export type TradeExecutionResult = {
@@ -249,6 +250,29 @@ export class TradeService {
         txHash,
       });
 
+      // Wait for inclusion so X gets a single "trade successful" reply right away.
+      const receipt = await waitForReceipt(live.publicClient, txHash, 25_000);
+      if (receipt?.status === "success") {
+        if (!record.tokenSymbol) {
+          const symbol = await fetchTokenSymbol(live.publicClient, input.tokenAddress);
+          if (symbol) {
+            record = updateTradeRecord(record, { tokenSymbol: symbol });
+          }
+        }
+        record = updateTradeRecord(record, {
+          status: "CONFIRMED",
+          blockNumber: receipt.blockNumber.toString(),
+        });
+        return {
+          record,
+          replyKind: "confirmed",
+          replyText: buildTradeReply(record, "confirmed", this.env.MONAD_EXPLORER_TX_URL),
+          reservedAmountWei: input.amountInWei,
+          committedAmountWei: input.amountInWei,
+        };
+      }
+
+      // Receipt not ready yet — confirm cron will post "trade successful" later.
       return {
         record,
         replyKind: "submitted",
