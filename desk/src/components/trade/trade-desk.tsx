@@ -10,7 +10,7 @@ import {
   useWaitForTransactionReceipt,
   useSignMessage,
 } from "wagmi";
-import { parseEther } from "viem";
+import { createPublicClient, formatEther, http, parseEther } from "viem";
 import {
   AppWindow,
   ArrowDown,
@@ -35,6 +35,11 @@ import {
   getNadFunTokenUrl,
   monadMainnet,
 } from "@/lib/monad-chain";
+
+const publicBalanceClient = createPublicClient({
+  chain: monadMainnet,
+  transport: http(monadMainnet.rpcUrls.default.http[0]),
+});
 
 type TradeAccountPayload = {
   linked: boolean;
@@ -245,6 +250,8 @@ export function TradeDesk() {
   const [tradeAmount, setTradeAmount] = useState("1");
   const [sellPercent, setSellPercent] = useState(100);
   const [tradeBusy, setTradeBusy] = useState(false);
+  /** On-chain MON for the linked hot wallet — works even when browser wallet is disconnected. */
+  const [hotWalletMon, setHotWalletMon] = useState<string | null>(null);
   const pendingDepositRef = useRef<{ amountMon: string; txHash: `0x${string}` } | null>(null);
   const recordedDepositsRef = useRef<Set<string>>(new Set());
 
@@ -349,6 +356,43 @@ export function TradeDesk() {
   useEffect(() => {
     if (account?.linked) void refreshPortfolio(activityPage);
   }, [account?.linked, activityPage, refreshPortfolio]);
+
+  // Always read the linked browser-wallet balance from chain (not wagmi).
+  // After setup, users often disconnect — balance must still show for "Your wallet".
+  useEffect(() => {
+    const addr = account?.account?.connectedWallet;
+    if (!account?.linked || !addr) {
+      setHotWalletMon(null);
+      return;
+    }
+
+    let cancelled = false;
+    const refreshHotBalance = async () => {
+      try {
+        const bal = await publicBalanceClient.getBalance({
+          address: addr as `0x${string}`,
+        });
+        if (!cancelled) setHotWalletMon(formatEther(bal));
+      } catch {
+        // Fall back to API balance via yourBal below.
+      }
+    };
+
+    void refreshHotBalance();
+    const id = window.setInterval(refreshHotBalance, 5000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refreshHotBalance();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, [account?.linked, account?.account?.connectedWallet]);
 
   // Live updates for demo UX — poll quietly + refresh when tab is focused.
   useEffect(() => {
@@ -679,7 +723,7 @@ export function TradeDesk() {
     return (
       <div className="mx-auto flex min-h-[60vh] w-full max-w-md flex-col items-center justify-center gap-3 text-center">
         <p className="text-sm font-semibold tracking-[0.22em] text-mx-accent uppercase">MonEx</p>
-        <Loader2 className="h-5 w-5 animate-spin text-mx-muted" />
+        <Loader2 className="mx-spinner h-5 w-5 text-mx-muted" />
       </div>
     );
   }
@@ -778,7 +822,7 @@ export function TradeDesk() {
           )}
           {loadingAccount ? (
             <p className="flex items-center justify-center gap-2 text-sm text-mx-muted">
-              <Loader2 className="h-4 w-4 animate-spin" /> Setting up trading wallet…
+              <Loader2 className="mx-spinner h-4 w-4" /> Setting up trading wallet…
             </p>
           ) : null}
           {status ? <p className="text-center text-sm text-red-300">{status}</p> : null}
@@ -789,14 +833,15 @@ export function TradeDesk() {
 
   // ——— Phase 3: Desk (fully onboarded) ———
   const tradingBal = formatMon(account?.balances?.inSiteMon);
-  const yourBal = formatMon(account?.balances?.connectedMon);
+  // Prefer live chain read so balance stays visible when browser wallet is disconnected.
+  const yourBal = formatMon(hotWalletMon ?? account?.balances?.connectedMon);
   const tradingAddr = account!.account!.inSiteWallet;
   const keyExportAvailable = account?.account?.keyExportAvailable !== false && !account?.account?.privateKeyExportedAt;
   const visibleHoldings = holdings.filter((h) => hasPositiveBalance(h.balance));
   const tradingMonRaw = Number(account?.balances?.inSiteMon ?? "0");
   const maxTransferMon =
     direction === "deposit"
-      ? maxSpendableMon(account?.balances?.connectedMon)
+      ? maxSpendableMon(hotWalletMon ?? account?.balances?.connectedMon)
       : maxSpendableMon(account?.balances?.inSiteMon);
   const canMaxTransfer = Number(maxTransferMon) > 0;
 
@@ -849,7 +894,20 @@ export function TradeDesk() {
 
             <div className="grid grid-cols-2 gap-2">
               <div className="rounded-xl border border-mx-border bg-mx-surface-2 p-3">
-                <p className="text-[11px] text-mx-muted">Your wallet</p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] text-mx-muted">Your wallet</p>
+                  {isConnected ? (
+                    <button
+                      type="button"
+                      title="Disconnect"
+                      onClick={() => disconnect()}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-semibold text-mx-muted transition hover:bg-mx-accent/10 hover:text-mx-accent"
+                    >
+                      <LogOut className="h-3 w-3 shrink-0" />
+                      <span className="hidden min-[380px]:inline">Disconnect</span>
+                    </button>
+                  ) : null}
+                </div>
                 <p className="mt-1.5 font-display text-xl font-bold text-mx-text">{yourBal}</p>
                 <p className="text-[11px] text-mx-muted">MON</p>
                 <p className="mt-1.5 font-mono text-[10px] text-mx-muted">
@@ -1036,7 +1094,7 @@ export function TradeDesk() {
             <div className="mx-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-xl border border-mx-border bg-mx-surface-2">
               {loadingPortfolio ? (
                 <p className="flex items-center gap-2 px-4 py-8 text-sm text-mx-muted">
-                  <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+                  <Loader2 className="mx-spinner h-4 w-4" /> Loading…
                 </p>
               ) : visibleHoldings.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center px-4 py-10 text-center">
@@ -1103,7 +1161,7 @@ export function TradeDesk() {
           <div className="rounded-2xl border border-mx-border bg-mx-surface/80 p-4">
             {loadingPortfolio ? (
               <p className="flex items-center gap-2 py-8 text-sm text-mx-muted">
-                <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+                <Loader2 className="mx-spinner h-4 w-4" /> Loading…
               </p>
             ) : recentTrades.length === 0 ? (
               <p className="py-8 text-center text-xs text-mx-muted">No activity yet.</p>
@@ -1289,16 +1347,6 @@ export function TradeDesk() {
             </>
           ) : null}
         </p>
-      ) : null}
-
-      {isConnected ? (
-        <button
-          type="button"
-          onClick={() => disconnect()}
-          className="mt-4 w-full text-center text-xs text-mx-muted hover:text-mx-text"
-        >
-          Disconnect browser wallet
-        </button>
       ) : null}
 
       {keyModal?.kind === "export" ? (

@@ -40,7 +40,7 @@ export function ImportStepIndicator({
               )}
             >
               {active ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                <Loader2 className="mx-spinner h-3.5 w-3.5" aria-hidden />
               ) : done ? (
                 <Check className="h-3.5 w-3.5" aria-hidden />
               ) : (
@@ -69,7 +69,7 @@ export function ImportStatusPanel({
   return (
     <div className="rounded-xl border border-mp-violet/30 bg-mp-violet/10 p-4 space-y-3">
       <div className="flex items-center gap-3">
-        <Loader2 className="h-5 w-5 shrink-0 animate-spin text-mp-violet-bright" aria-hidden />
+        <Loader2 className="mx-spinner h-5 w-5 shrink-0 text-mp-violet-bright" aria-hidden />
         <div>
           <p className="font-semibold text-mp-text">{title}</p>
           {detail && <p className="text-sm text-mp-text-secondary">{detail}</p>}

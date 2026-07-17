@@ -29,7 +29,24 @@ html {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+
+  /* Loading indicators must keep spinning so users know work is in progress. */
+  .animate-spin,
+  .mx-spinner {
+    animation: mx-spin 0.75s linear infinite !important;
+  }
 }
+
+@keyframes mx-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.mx-spinner {
+  animation: mx-spin 0.75s linear infinite;
+}
+
 
 body {
   background:

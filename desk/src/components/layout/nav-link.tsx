@@ -11,7 +11,7 @@ import { NavigationContext } from "@/components/layout/navigation-provider";
 function NavLinkIndicator() {
   const { pending } = useLinkStatus();
   if (!pending) return null;
-  return <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-mp-violet-bright" aria-hidden />;
+  return <Loader2 className="mx-spinner h-3.5 w-3.5 shrink-0 text-mp-violet-bright" aria-hidden />;
 }
 
 type NavLinkProps = {
@@ -76,7 +76,7 @@ export function MobileNavLinkIndicator() {
   if (!pending) return null;
   return (
     <Loader2
-      className="absolute top-1 right-[calc(50%-22px)] h-3 w-3 animate-spin text-mp-violet-bright"
+      className="mx-spinner absolute top-1 right-[calc(50%-22px)] h-3 w-3 text-mp-violet-bright"
       aria-hidden
     />
   );
@@ -105,7 +105,7 @@ function LogoMark() {
 
   return (
     <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-mp-violet to-mp-violet-bright text-sm text-white shadow-glow">
-      {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : "MP"}
+      {pending ? <Loader2 className="mx-spinner h-4 w-4" aria-hidden /> : "MP"}
     </span>
   );
 }
