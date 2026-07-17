@@ -37,4 +37,24 @@ export const nadfunRouterV2Abi = [
     outputs: [],
     stateMutability: "payable",
   },
+  {
+    type: "function",
+    name: "sellToNative",
+    inputs: [
+      {
+        name: "params",
+        type: "tuple",
+        internalType: "struct INadFunRouter.SellToNativeParams",
+        components: [
+          { name: "amountIn", type: "uint256", internalType: "uint256" },
+          { name: "amountOutMin", type: "uint256", internalType: "uint256" },
+          { name: "token", type: "address", internalType: "address" },
+          { name: "to", type: "address", internalType: "address" },
+          { name: "deadline", type: "uint256", internalType: "uint256" },
+        ],
+      },
+    ],
+    outputs: [{ name: "amountOut", type: "uint256", internalType: "uint256" }],
+    stateMutability: "nonpayable",
+  },
 ] as const;

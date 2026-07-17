@@ -32,13 +32,15 @@ export async function queryV1LensQuote(input: {
   lensAddress: `0x${string}`;
   tokenAddress: `0x${string}`;
   amountInWei: bigint;
+  isBuy?: boolean;
 }): Promise<LensQuote> {
+  const isBuy = input.isBuy !== false;
   try {
     const [router, amountOut] = await input.publicClient.readContract({
       address: input.lensAddress,
       abi: lensAbi,
       functionName: "getAmountOut",
-      args: [input.tokenAddress, input.amountInWei, true],
+      args: [input.tokenAddress, input.amountInWei, isBuy],
     });
 
     return {
@@ -58,13 +60,15 @@ export async function queryV2RouterQuote(input: {
   publicClient: PublicClient;
   tokenAddress: `0x${string}`;
   amountInWei: bigint;
+  isBuy?: boolean;
 }): Promise<LensQuote> {
+  const isBuy = input.isBuy !== false;
   try {
     const amountOut = await input.publicClient.readContract({
       address: NADFUN_MAINNET.V2_ROUTER,
       abi: nadfunRouterV2Abi,
       functionName: "getAmountOut",
-      args: [input.tokenAddress, input.amountInWei, true],
+      args: [input.tokenAddress, input.amountInWei, isBuy],
     });
 
     if (amountOut <= 0n) {
@@ -90,6 +94,7 @@ export async function queryLensQuote(input: {
   lensAddress: `0x${string}`;
   tokenAddress: `0x${string}`;
   amountInWei: bigint;
+  isBuy?: boolean;
 }): Promise<LensQuote> {
   try {
     return await queryV1LensQuote(input);
@@ -101,6 +106,7 @@ export async function queryLensQuote(input: {
       publicClient: input.publicClient,
       tokenAddress: input.tokenAddress,
       amountInWei: input.amountInWei,
+      isBuy: input.isBuy,
     });
   }
 }

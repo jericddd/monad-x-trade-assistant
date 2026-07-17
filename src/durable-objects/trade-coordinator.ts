@@ -181,6 +181,15 @@ export class TradeCoordinator implements DurableObject {
       return Response.json({ trades });
     }
 
+    if (url.pathname === "/record-trade" && request.method === "POST") {
+      const body = (await request.json()) as { record?: TradeRecord };
+      if (!body.record?.tweetId || !body.record.authorId) {
+        return Response.json({ error: "invalid_record" }, { status: 400 });
+      }
+      await this.saveTradeRecord(body.record);
+      return Response.json({ ok: true });
+    }
+
     return new Response("not found", { status: 404 });
   }
 

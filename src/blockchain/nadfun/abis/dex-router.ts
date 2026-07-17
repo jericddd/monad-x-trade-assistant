@@ -18,4 +18,24 @@ export const dexRouterAbi = [
     outputs: [{ name: "amountOut", type: "uint256", internalType: "uint256" }],
     stateMutability: "payable",
   },
+  {
+    type: "function",
+    name: "sell",
+    inputs: [
+      {
+        name: "params",
+        type: "tuple",
+        internalType: "struct IDexRouter.SellParams",
+        components: [
+          { name: "amountIn", type: "uint256", internalType: "uint256" },
+          { name: "amountOutMin", type: "uint256", internalType: "uint256" },
+          { name: "token", type: "address", internalType: "address" },
+          { name: "to", type: "address", internalType: "address" },
+          { name: "deadline", type: "uint256", internalType: "uint256" },
+        ],
+      },
+    ],
+    outputs: [{ name: "amountOut", type: "uint256", internalType: "uint256" }],
+    stateMutability: "nonpayable",
+  },
 ] as const;

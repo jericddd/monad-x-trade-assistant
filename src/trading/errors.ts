@@ -29,6 +29,7 @@ export type TradeErrorCode =
   | "SUBMISSION_UNKNOWN"
   | "CONFIRMATION_TIMEOUT"
   | "CONFIGURATION_ERROR"
+  | "TOKEN_NOT_IN_PORTFOLIO"
   | "INTERNAL_AUTH_FAILED"
   | "X_API_ERROR"
   | "X_REPLY_FAILED";
@@ -76,6 +77,7 @@ export const SAFE_ERROR_MESSAGES: Record<TradeErrorCode, string> = {
   SUBMISSION_UNKNOWN: "transaction submission result is unknown",
   CONFIRMATION_TIMEOUT: "transaction confirmation timed out",
   CONFIGURATION_ERROR: "service configuration is invalid",
+  TOKEN_NOT_IN_PORTFOLIO: "token is not in your portfolio — buy on X first",
   INTERNAL_AUTH_FAILED: "internal authorization failed",
   X_API_ERROR: "X API request failed",
   X_REPLY_FAILED: "failed to reply on X",

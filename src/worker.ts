@@ -2,6 +2,7 @@ import type { AppEnv } from "./env.js";
 import { healthResponse } from "./routes/health.js";
 import { handleUsersApi } from "./routes/api-users.js";
 import { handlePortfolioApi } from "./routes/api-portfolio.js";
+import { handleTradeApi } from "./routes/api-trade.js";
 import { createXClient } from "./x/client.js";
 import { runScheduledPoll } from "./x/polling.js";
 import { parseEnvLenient } from "./env.js";
@@ -58,7 +59,9 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
   }
 
   const apiResponse =
-    (await handlePortfolioApi(request, env)) ?? (await handleUsersApi(request, env));
+    (await handleTradeApi(request, env)) ??
+    (await handlePortfolioApi(request, env)) ??
+    (await handleUsersApi(request, env));
   if (apiResponse) {
     const headers = new Headers(apiResponse.headers);
     headers.set("access-control-allow-origin", "https://packs.monexmonad.xyz");

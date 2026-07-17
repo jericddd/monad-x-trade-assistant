@@ -1,10 +1,12 @@
 import type { Hex, PublicClient, WalletClient } from "viem";
-import { keccak256 } from "viem";
+import { encodeFunctionData, keccak256, maxUint256 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { isAllowlistedRouter } from "../utils/address.js";
 import { createTradeError } from "../trading/errors.js";
 import { createSubmissionError } from "../trading/submission-error.js";
 import { buildBuyTransaction } from "./nadfun/build-buy.js";
+import { buildSellTransaction } from "./nadfun/build-sell.js";
+import { erc20Abi } from "./nadfun/abis/erc20.js";
 
 /** Require a local private-key account — never eth_signTransaction over RPC. */
 function requireLocalSigner(walletClient: WalletClient) {
@@ -57,13 +59,110 @@ async function waitForTxVisible(
   return false;
 }
 
+async function signAndBroadcast(input: {
+  publicClient: PublicClient;
+  walletClient: WalletClient;
+  walletAddress: `0x${string}`;
+  to: `0x${string}`;
+  data: Hex;
+  value?: bigint;
+  gas?: bigint;
+  gasPrice?: bigint;
+}): Promise<`0x${string}`> {
+  const account = requireLocalSigner(input.walletClient);
+  if (account.address.toLowerCase() !== input.walletAddress.toLowerCase()) {
+    throw createTradeError("CONFIGURATION_ERROR", "signer address mismatch");
+  }
+
+  let serialized: Hex;
+  let hash: Hex;
+  let nonce: number | undefined;
+
+  try {
+    const request = await input.walletClient.prepareTransactionRequest({
+      account,
+      to: input.to,
+      data: input.data,
+      value: input.value ?? 0n,
+      gas: input.gas,
+      gasPrice: input.gasPrice,
+      chain: input.walletClient.chain,
+    });
+    nonce = typeof request.nonce === "number" ? request.nonce : undefined;
+    const { account: _account, ...unsigned } = request as typeof request & {
+      account?: unknown;
+    };
+    serialized = await account.signTransaction(
+      unsigned as Parameters<NonNullable<typeof account.signTransaction>>[0],
+    );
+    hash = keccak256(serialized);
+  } catch (error) {
+    if (error instanceof Error && "code" in error) throw error;
+    const message = error instanceof Error ? error.message : "sign failed";
+    throw createTradeError("SUBMISSION_FAILED", message.slice(0, 120));
+  }
+
+  const maxAttempts = 5;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      const sent = await input.publicClient.sendRawTransaction({
+        serializedTransaction: serialized,
+      });
+      return (sent || hash) as `0x${string}`;
+    } catch (error) {
+      const lastMessage = error instanceof Error ? error.message : "broadcast failed";
+
+      if (isAlreadyKnownError(lastMessage)) {
+        if (await waitForTxVisible(input.publicClient, hash, 4_000)) {
+          return hash as `0x${string}`;
+        }
+      }
+
+      if (await isTxVisible(input.publicClient, hash)) {
+        return hash as `0x${string}`;
+      }
+
+      const transient = isTransientBroadcastError(lastMessage);
+      if (!transient && attempt >= 1) break;
+
+      await sleep(250 * (attempt + 1));
+
+      if (await waitForTxVisible(input.publicClient, hash, 1_200)) {
+        return hash as `0x${string}`;
+      }
+    }
+  }
+
+  if (await waitForTxVisible(input.publicClient, hash, 3_000)) {
+    return hash as `0x${string}`;
+  }
+
+  if (nonce != null) {
+    try {
+      const pending = await input.publicClient.getTransactionCount({
+        address: input.walletAddress,
+        blockTag: "pending",
+      });
+      if (pending > nonce) {
+        throw createSubmissionError(
+          "SUBMISSION_UNKNOWN",
+          "nonce advanced after broadcast — check trading wallet before retrying",
+          hash,
+        );
+      }
+    } catch (error) {
+      if (error instanceof Error && "code" in error) throw error;
+    }
+  }
+
+  throw createSubmissionError("SUBMISSION_FAILED", "broadcast did not land — safe to retry", hash);
+}
+
 /**
  * Restricted signer — only Nad.fun buy transactions to allowlisted routers.
  *
  * Wallet-style flow: prepare + sign locally (so we always know the hash), then
- * broadcast the raw tx with retries / multi-RPC. Re-broadcasting the same raw
- * payload is safe. This avoids the old "sendTransaction timed out with no hash"
- * UNKNOWN path that browser wallets rarely hit.
+ * broadcast the raw tx with retries / multi-RPC.
  */
 export async function executeNadfunBuy(input: {
   publicClient: PublicClient;
@@ -90,110 +189,90 @@ export async function executeNadfunBuy(input: {
     routerAddress: input.routerAddress,
   });
 
-  // Slight tip over estimate to improve inclusion under load.
   const gasPrice = input.gasPrice != null ? (input.gasPrice * 112n) / 100n : undefined;
 
-  let serialized: Hex;
-  let hash: Hex;
-  let nonce: number | undefined;
+  return signAndBroadcast({
+    publicClient: input.publicClient,
+    walletClient: input.walletClient,
+    walletAddress: input.walletAddress,
+    to: input.routerAddress,
+    data,
+    value: input.amountInWei,
+    gas: input.gas,
+    gasPrice,
+  });
+}
 
-  try {
-    // Pass the LocalAccount (not an address string). Address-only accounts make
-    // viem call eth_signTransaction on the RPC — public nodes reject that.
-    const account = requireLocalSigner(input.walletClient);
-    if (account.address.toLowerCase() !== input.walletAddress.toLowerCase()) {
-      throw createTradeError("CONFIGURATION_ERROR", "signer address mismatch");
-    }
+/**
+ * Sell tokens for MON on allowlisted Nad.fun routers.
+ * Approves the router when allowance is insufficient, then submits sell.
+ */
+export async function executeNadfunSell(input: {
+  publicClient: PublicClient;
+  walletClient: WalletClient;
+  walletAddress: `0x${string}`;
+  tokenAddress: `0x${string}`;
+  amountIn: bigint;
+  amountOutMin: bigint;
+  routerAddress: `0x${string}`;
+  deadline: bigint;
+  allowedRouters: readonly `0x${string}`[];
+  gas?: bigint;
+  gasPrice?: bigint;
+}): Promise<`0x${string}`> {
+  if (!isAllowlistedRouter(input.routerAddress, input.allowedRouters)) {
+    throw createTradeError("ROUTER_NOT_ALLOWED");
+  }
 
-    const request = await input.walletClient.prepareTransactionRequest({
-      account,
-      to: input.routerAddress,
-      data,
-      value: input.amountInWei,
-      gas: input.gas,
-      gasPrice,
-      chain: input.walletClient.chain,
+  const gasPrice = input.gasPrice != null ? (input.gasPrice * 112n) / 100n : undefined;
+
+  const allowance = (await input.publicClient.readContract({
+    address: input.tokenAddress,
+    abi: erc20Abi,
+    functionName: "allowance",
+    args: [input.walletAddress, input.routerAddress],
+  })) as bigint;
+
+  if (allowance < input.amountIn) {
+    const approveData = encodeFunctionData({
+      abi: erc20Abi,
+      functionName: "approve",
+      args: [input.routerAddress, maxUint256],
     });
-    nonce = typeof request.nonce === "number" ? request.nonce : undefined;
-    // Sign with the local account API — never walletClient.signTransaction with
-    // an address-only account (that path hits eth_signTransaction on the node).
-    // Strip `account` from the prepared request; LocalAccount.signTransaction
-    // expects a TransactionSerializable payload only.
-    const { account: _account, ...unsigned } = request as typeof request & {
-      account?: unknown;
-    };
-    serialized = await account.signTransaction(
-      unsigned as Parameters<NonNullable<typeof account.signTransaction>>[0],
-    );
-    hash = keccak256(serialized);
-  } catch (error) {
-    if (error instanceof Error && "code" in error) throw error;
-    const message = error instanceof Error ? error.message : "sign failed";
-    throw createTradeError("SUBMISSION_FAILED", message.slice(0, 120));
+    const approveHash = await signAndBroadcast({
+      publicClient: input.publicClient,
+      walletClient: input.walletClient,
+      walletAddress: input.walletAddress,
+      to: input.tokenAddress,
+      data: approveData,
+      value: 0n,
+      gas: 80_000n,
+      gasPrice,
+    });
+    // Wait until the approve is visible so the sell nonce/allowance are ready.
+    await waitForTxVisible(input.publicClient, approveHash, 12_000);
+    await sleep(800);
   }
 
-  const maxAttempts = 5;
-  let lastMessage = "broadcast failed";
+  const data = buildSellTransaction({
+    tokenAddress: input.tokenAddress,
+    amountIn: input.amountIn,
+    amountOutMin: input.amountOutMin,
+    recipient: input.walletAddress,
+    deadline: input.deadline,
+    routerAddress: input.routerAddress,
+  });
 
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    try {
-      const sent = await input.publicClient.sendRawTransaction({
-        serializedTransaction: serialized,
-      });
-      return (sent || hash) as `0x${string}`;
-    } catch (error) {
-      lastMessage = error instanceof Error ? error.message : "broadcast failed";
-
-      // Node already has this exact payload — treat as success if visible.
-      if (isAlreadyKnownError(lastMessage)) {
-        if (await waitForTxVisible(input.publicClient, hash, 4_000)) {
-          return hash as `0x${string}`;
-        }
-      }
-
-      if (await isTxVisible(input.publicClient, hash)) {
-        return hash as `0x${string}`;
-      }
-
-      const transient = isTransientBroadcastError(lastMessage);
-      if (!transient && attempt >= 1) {
-        break;
-      }
-
-      await sleep(250 * (attempt + 1));
-
-      // Same signed payload can be re-broadcast safely.
-      if (await waitForTxVisible(input.publicClient, hash, 1_200)) {
-        return hash as `0x${string}`;
-      }
-    }
-  }
-
-  if (await waitForTxVisible(input.publicClient, hash, 3_000)) {
-    return hash as `0x${string}`;
-  }
-
-  // If the nonce moved, something may have landed — ask user to verify.
-  if (nonce != null) {
-    try {
-      const pending = await input.publicClient.getTransactionCount({
-        address: input.walletAddress,
-        blockTag: "pending",
-      });
-      if (pending > nonce) {
-        throw createSubmissionError(
-          "SUBMISSION_UNKNOWN",
-          "nonce advanced after broadcast — check trading wallet before retrying",
-          hash,
-        );
-      }
-    } catch (error) {
-      if (error instanceof Error && "code" in error) throw error;
-    }
-  }
-
-  // Signed but never seen on any RPC — safe to retry with a new command.
-  throw createSubmissionError("SUBMISSION_FAILED", "broadcast did not land — safe to retry", hash);
+  return signAndBroadcast({
+    publicClient: input.publicClient,
+    walletClient: input.walletClient,
+    walletAddress: input.walletAddress,
+    to: input.routerAddress,
+    data,
+    value: 0n,
+    gas: input.gas,
+    gasPrice,
+  });
 }
 
 export function getTradeWalletAddress(privateKey: string): `0x${string}` {
