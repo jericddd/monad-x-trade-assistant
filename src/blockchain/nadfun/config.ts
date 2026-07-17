@@ -27,6 +27,10 @@ export function isV2Router(address: string): boolean {
   return address.toLowerCase() === NADFUN_MAINNET.V2_ROUTER.toLowerCase();
 }
 
+export function isDexRouter(address: string): boolean {
+  return address.toLowerCase() === NADFUN_MAINNET.DEX_ROUTER.toLowerCase();
+}
+
 export type NadfunConfig = {
   lensAddress: `0x${string}`;
   allowedRouters: readonly `0x${string}`[];

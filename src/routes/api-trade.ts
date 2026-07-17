@@ -139,11 +139,34 @@ export async function handleTradeApi(request: Request, env: Env): Promise<Respon
 
     await saveAppTrade(env, result.record);
 
+    const success =
+      result.record.status === "SUBMITTED" ||
+      result.record.status === "CONFIRMED" ||
+      result.record.status === "DRY_RUN_SUCCESS";
+
+    if (!success) {
+      return Response.json(
+        {
+          ok: false,
+          status: result.record.status,
+          dryRun: false,
+          txHash: result.record.txHash ?? null,
+          tradeId: result.record.tweetId,
+          action: result.record.action,
+          source: "app",
+          amountMon: result.record.requestedAmountMon,
+          tokenAddress: result.record.tokenAddress,
+          tokenSymbol: result.record.tokenSymbol ?? null,
+          expectedAmountOut: result.record.expectedAmountOut ?? null,
+          error: result.record.failureMessageSafe ?? result.record.failureCode ?? "trade_failed",
+          message: result.record.failureMessageSafe ?? "Trade failed",
+        },
+        { status: 400 },
+      );
+    }
+
     return Response.json({
-      ok:
-        result.record.status === "SUBMITTED" ||
-        result.record.status === "CONFIRMED" ||
-        result.record.status === "DRY_RUN_SUCCESS",
+      ok: true,
       status: result.record.status,
       dryRun: result.record.status === "DRY_RUN_SUCCESS",
       txHash: result.record.txHash ?? null,
@@ -152,7 +175,9 @@ export async function handleTradeApi(request: Request, env: Env): Promise<Respon
       source: "app",
       amountMon: result.record.requestedAmountMon,
       tokenAddress: result.record.tokenAddress,
-      error: result.record.failureMessageSafe ?? null,
+      tokenSymbol: result.record.tokenSymbol ?? null,
+      expectedAmountOut: result.record.expectedAmountOut ?? null,
+      error: null,
     });
   } catch (error) {
     if (error instanceof TradeError) {

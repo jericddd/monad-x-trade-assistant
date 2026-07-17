@@ -1,7 +1,8 @@
 import { encodeFunctionData } from "viem";
 import { bondingCurveRouterAbi } from "./abis/bonding-curve-router.js";
+import { dexRouterAbi } from "./abis/dex-router.js";
 import { nadfunRouterV2Abi } from "./abis/nadfun-router-v2.js";
-import { isV2Router } from "./config.js";
+import { isDexRouter, isV2Router } from "./config.js";
 
 export type SellCalldataInput = {
   tokenAddress: `0x${string}`;
@@ -25,6 +26,14 @@ export function buildSellTransaction(input: SellCalldataInput): `0x${string}` {
     return encodeFunctionData({
       abi: nadfunRouterV2Abi,
       functionName: "sellToNative",
+      args: [params],
+    });
+  }
+
+  if (input.routerAddress && isDexRouter(input.routerAddress)) {
+    return encodeFunctionData({
+      abi: dexRouterAbi,
+      functionName: "sell",
       args: [params],
     });
   }

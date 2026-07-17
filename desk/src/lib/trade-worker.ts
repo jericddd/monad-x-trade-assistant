@@ -226,12 +226,15 @@ export async function renewInSiteWallet(xUserId: string): Promise<{
 export type AppTradeResponse = {
   ok: boolean;
   status: string;
+  dryRun?: boolean;
   txHash: Hex | null;
   tradeId: string;
   action: "buy" | "sell";
   source: "app";
   amountMon: string;
   tokenAddress: string;
+  tokenSymbol?: string | null;
+  expectedAmountOut?: string | null;
   error?: string | null;
   message?: string;
 };

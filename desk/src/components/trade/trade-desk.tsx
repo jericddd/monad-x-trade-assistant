@@ -72,6 +72,17 @@ type TradeModal = {
   balance: string;
 };
 
+type TradeSuccessModal = {
+  action: "buy" | "sell";
+  symbol: string;
+  /** Primary amount shown under Bought/Sold (MON spent or sell %). */
+  amountLabel: string;
+  /** Optional secondary line (e.g. estimated MON received on sell). */
+  detailLabel?: string;
+  dryRun?: boolean;
+  txUrl?: string | null;
+};
+
 type PortfolioHolding = {
   tokenAddress: `0x${string}`;
   symbol: string;
@@ -247,6 +258,7 @@ export function TradeDesk() {
   const [keyBusy, setKeyBusy] = useState(false);
   const [keyCopied, setKeyCopied] = useState(false);
   const [tradeModal, setTradeModal] = useState<TradeModal | null>(null);
+  const [tradeSuccess, setTradeSuccess] = useState<TradeSuccessModal | null>(null);
   const [tradeAmount, setTradeAmount] = useState("1");
   const [sellPercent, setSellPercent] = useState(100);
   const [tradeBusy, setTradeBusy] = useState(false);
@@ -610,18 +622,22 @@ export function TradeDesk() {
     setTradeBusy(true);
     setStatus(null);
     setTxUrl(null);
+    const action = tradeModal.action;
+    const symbol = tradeModal.symbol;
+    const buyAmount = tradeAmount;
+    const percent = sellPercent;
     try {
       const body =
-        tradeModal.action === "buy"
+        action === "buy"
           ? {
               action: "buy" as const,
               tokenAddress: tradeModal.tokenAddress,
-              amountMon: tradeAmount,
+              amountMon: buyAmount,
             }
           : {
               action: "sell" as const,
               tokenAddress: tradeModal.tokenAddress,
-              percent: sellPercent,
+              percent,
             };
       const res = await fetch("/api/trade/execute", {
         method: "POST",
@@ -633,23 +649,32 @@ export function TradeDesk() {
         status?: string;
         dryRun?: boolean;
         txHash?: string | null;
+        amountMon?: string;
+        tokenSymbol?: string | null;
         error?: string;
         message?: string;
       };
-      if (!res.ok) {
+      if (!res.ok || data.ok === false) {
         throw new Error(data.message ?? data.error ?? "Trade failed");
       }
+
+      const ticker = (data.tokenSymbol ?? symbol ?? "TOKEN").replace(/^\$/, "");
+      const explorerUrl = data.txHash ? getExplorerTxUrl(data.txHash) : null;
       setTradeModal(null);
-      if (data.dryRun || data.status === "DRY_RUN_SUCCESS") {
-        setStatus("Dry run only — no on-chain transaction");
-        setTxUrl(null);
-      } else if (data.txHash) {
-        setStatus(tradeModal.action === "buy" ? "Buy submitted" : "Sell submitted");
-        setTxUrl(getExplorerTxUrl(data.txHash));
-      } else {
-        setStatus(`${tradeModal.action === "buy" ? "Buy" : "Sell"} ${data.status ?? "ok"}`);
-        setTxUrl(null);
-      }
+      setTradeSuccess({
+        action,
+        symbol: ticker,
+        amountLabel:
+          action === "buy" ? `${formatMon(buyAmount)} MON` : `${percent}%`,
+        detailLabel:
+          action === "sell" && data.amountMon
+            ? `~${formatMon(data.amountMon)} MON`
+            : undefined,
+        dryRun: Boolean(data.dryRun || data.status === "DRY_RUN_SUCCESS"),
+        txUrl: explorerUrl,
+      });
+      setStatus(null);
+      setTxUrl(explorerUrl);
       await refreshAccount({ silent: true });
       await refreshPortfolio(activityPage, { silent: true });
     } catch (error) {
@@ -1568,6 +1593,50 @@ export function TradeDesk() {
                 Cancel
               </Button>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {tradeSuccess ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 px-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="w-full max-w-sm rounded-2xl border border-mx-border bg-mx-surface-2 p-6 text-center shadow-glow animate-fade-up"
+          >
+            <p
+              className={`font-display text-3xl font-bold ${
+                tradeSuccess.action === "buy" ? "text-mx-accent" : "text-red-300"
+              }`}
+            >
+              {tradeSuccess.action === "buy" ? "Bought" : "Sold"}
+            </p>
+            <p className="mt-3 font-display text-2xl font-bold text-mx-accent">
+              ${tradeSuccess.symbol}
+            </p>
+            <p className="mt-2 text-lg font-semibold text-mx-text">{tradeSuccess.amountLabel}</p>
+            {tradeSuccess.detailLabel ? (
+              <p className="mt-1 text-sm text-mx-muted">{tradeSuccess.detailLabel}</p>
+            ) : null}
+            {tradeSuccess.dryRun ? (
+              <p className="mt-3 text-xs text-mx-muted">Dry run — no on-chain transaction</p>
+            ) : null}
+            {tradeSuccess.txUrl ? (
+              <a
+                href={tradeSuccess.txUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-4 inline-flex items-center justify-center gap-1.5 text-sm text-mx-accent hover:underline"
+              >
+                View tx <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+            ) : null}
+            <Button
+              className="mt-5 w-full sm:!w-full"
+              onClick={() => setTradeSuccess(null)}
+            >
+              Done
+            </Button>
           </div>
         </div>
       ) : null}
