@@ -110,12 +110,19 @@ export async function handlePortfolioApi(request: Request, env: Env): Promise<Re
     if (!successStatuses.has(trade.status)) continue;
     const key = trade.tokenAddress.toLowerCase();
     const prev = byToken.get(key);
-    const spent = Number(trade.requestedAmountMon) || 0;
+    const isSell = trade.action === "sell";
+    const spent = isSell ? 0 : Number(trade.requestedAmountMon) || 0;
     if (!prev) {
-      byToken.set(key, { buys: 1, spentMon: spent, last: trade });
+      byToken.set(key, {
+        buys: isSell ? 0 : 1,
+        spentMon: spent,
+        last: trade,
+      });
     } else {
-      prev.buys += 1;
-      prev.spentMon += spent;
+      if (!isSell) {
+        prev.buys += 1;
+        prev.spentMon += spent;
+      }
       if (trade.createdAt > prev.last.createdAt) prev.last = trade;
     }
   }

@@ -8,6 +8,7 @@ import {
 } from "../client.js";
 import { hasContractBytecode, isTokenLocked, queryLensQuote } from "./lens.js";
 import { simulateBuyTransaction } from "./simulate-buy.js";
+import { simulateSellTransaction } from "./simulate-sell.js";
 import { privateKeyToAccount } from "viem/accounts";
 import type { Hex } from "viem";
 
@@ -20,10 +21,19 @@ export type QuoteResult = {
 
 export interface QuoteProvider {
   getBuyQuote(input: { tokenAddress: `0x${string}`; amountInWei: bigint }): Promise<QuoteResult>;
+  getSellQuote?(input: { tokenAddress: `0x${string}`; amountInWei: bigint }): Promise<QuoteResult>;
 }
 
 export interface SimulationProvider {
   simulateBuy(input: {
+    tokenAddress: `0x${string}`;
+    amountInWei: bigint;
+    amountOutMin: bigint;
+    routerAddress: `0x${string}`;
+    recipient: `0x${string}`;
+    deadline: bigint;
+  }): Promise<{ ok: true } | { ok: false; reason: string }>;
+  simulateSell?(input: {
     tokenAddress: `0x${string}`;
     amountInWei: bigint;
     amountOutMin: bigint;
@@ -85,6 +95,18 @@ export class MockQuoteProvider implements QuoteProvider {
       hasBytecode: true,
     };
   }
+
+  async getSellQuote(input: {
+    tokenAddress: `0x${string}`;
+    amountInWei: bigint;
+  }): Promise<QuoteResult> {
+    const buy = await this.getBuyQuote(input);
+    // Mock sells return a small fraction of token amount as MON.
+    return {
+      ...buy,
+      expectedAmountOut: input.amountInWei / 1_284_392n || 1n,
+    };
+  }
 }
 
 export class MockSimulationProvider implements SimulationProvider {
@@ -103,6 +125,17 @@ export class MockSimulationProvider implements SimulationProvider {
     }
 
     return { ok: true };
+  }
+
+  async simulateSell(input: {
+    tokenAddress: `0x${string}`;
+    amountInWei: bigint;
+    amountOutMin: bigint;
+    routerAddress: `0x${string}`;
+    recipient: `0x${string}`;
+    deadline: bigint;
+  }): Promise<{ ok: true } | { ok: false; reason: string }> {
+    return this.simulateBuy(input);
   }
 }
 
@@ -153,6 +186,49 @@ export class RealQuoteProvider implements QuoteProvider {
       hasBytecode: true,
     };
   }
+
+  async getSellQuote(input: {
+    tokenAddress: `0x${string}`;
+    amountInWei: bigint;
+  }): Promise<QuoteResult> {
+    await assertConfiguredChainId(this.publicClient, this.env.MONAD_CHAIN_ID ?? 143);
+
+    const hasBytecode = await hasContractBytecode({
+      publicClient: this.publicClient,
+      tokenAddress: input.tokenAddress,
+    });
+
+    if (!hasBytecode) {
+      return {
+        routerAddress: NADFUN_MAINNET.BONDING_CURVE_ROUTER,
+        expectedAmountOut: 0n,
+        isLocked: false,
+        hasBytecode: false,
+      };
+    }
+
+    const lensAddress = this.env.NADFUN_LENS_ADDRESS ?? NADFUN_MAINNET.LENS;
+    const quote = await queryLensQuote({
+      publicClient: this.publicClient,
+      lensAddress,
+      tokenAddress: input.tokenAddress,
+      amountInWei: input.amountInWei,
+      isBuy: false,
+    });
+
+    const locked = await isTokenLocked({
+      publicClient: this.publicClient,
+      lensAddress,
+      tokenAddress: input.tokenAddress,
+    });
+
+    return {
+      routerAddress: quote.routerAddress,
+      expectedAmountOut: quote.expectedAmountOut,
+      isLocked: locked,
+      hasBytecode: true,
+    };
+  }
 }
 
 export class RealSimulationProvider implements SimulationProvider {
@@ -175,6 +251,26 @@ export class RealSimulationProvider implements SimulationProvider {
       routerAddress: input.routerAddress,
       tokenAddress: input.tokenAddress,
       amountInWei: input.amountInWei,
+      amountOutMin: input.amountOutMin,
+      recipient: input.recipient,
+      deadline: input.deadline,
+    });
+  }
+
+  async simulateSell(input: {
+    tokenAddress: `0x${string}`;
+    amountInWei: bigint;
+    amountOutMin: bigint;
+    routerAddress: `0x${string}`;
+    recipient: `0x${string}`;
+    deadline: bigint;
+  }): Promise<{ ok: true } | { ok: false; reason: string }> {
+    return simulateSellTransaction({
+      publicClient: this.publicClient,
+      account: input.recipient,
+      routerAddress: input.routerAddress,
+      tokenAddress: input.tokenAddress,
+      amountIn: input.amountInWei,
       amountOutMin: input.amountOutMin,
       recipient: input.recipient,
       deadline: input.deadline,
