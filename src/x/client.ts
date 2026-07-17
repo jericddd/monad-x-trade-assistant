@@ -2,7 +2,7 @@ import { buildOAuth1AuthorizationHeader } from "./oauth1.js";
 import { createTradeError } from "../trading/errors.js";
 import { normalizeOptionalNumericUserId } from "./user-id.js";
 
-const X_API_BASE = "https://api.twitter.com/2";
+const X_API_BASE = "https://api.x.com/2";
 
 export type XTweet = {
   id: string;
@@ -232,12 +232,17 @@ export class RealXClient implements XClient {
     });
 
     if (!response.ok) {
-      throw createTradeError("X_REPLY_FAILED");
+      const detail = await readXApiError(response);
+      const suffix = detail ? `: ${detail}` : "";
+      throw createTradeError(
+        "X_REPLY_FAILED",
+        `tweets request failed (${response.status})${suffix}`,
+      );
     }
 
     const body = (await response.json()) as { data?: { id?: string } };
     if (!body.data?.id) {
-      throw createTradeError("X_REPLY_FAILED");
+      throw createTradeError("X_REPLY_FAILED", "tweets response missing id");
     }
 
     return { id: body.data.id };

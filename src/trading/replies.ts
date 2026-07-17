@@ -52,12 +52,18 @@ function tickerLabel(record: TradeRecord): string {
   const raw = (record.tokenSymbol ?? "").trim();
   if (!raw) return "TOKEN";
   // Strip a leading $ if the symbol already includes it.
+  // Avoid cashtag form ($TICKER) — X often rejects automated crypto posts with cashtags.
   return raw.replace(/^\$+/, "").toUpperCase() || "TOKEN";
 }
 
 function tokenLine(record: TradeRecord): string {
   // Full CA only — ticker already appears on the received line.
   return `token: ${record.tokenAddress}`;
+}
+
+function shortenTx(txHash: string): string {
+  if (txHash.length < 14) return txHash;
+  return `${txHash.slice(0, 10)}…${txHash.slice(-6)}`;
 }
 
 /**
@@ -80,8 +86,8 @@ export function buildTradeReply(
         "dry run successful",
         "",
         `would spend: ${record.requestedAmountMon} MON`,
-        `estimated tokens: ${formatTokenAmount(record.expectedAmountOut)} $${ticker}`,
-        `minimum tokens: ${formatTokenAmount(record.minimumAmountOut)} $${ticker}`,
+        `estimated tokens: ${formatTokenAmount(record.expectedAmountOut)} ${ticker}`,
+        `minimum tokens: ${formatTokenAmount(record.minimumAmountOut)} ${ticker}`,
         tokenLine(record),
         "no transaction was submitted",
       ].join("\n");
@@ -97,7 +103,7 @@ export function buildTradeReply(
         pickSuccessHeadline(record.tweetId || record.txHash || record.tokenAddress),
         "",
         `spent: ${record.requestedAmountMon} MON`,
-        `received: ${formatTokenAmount(record.expectedAmountOut)} $${ticker}`,
+        `received: ${formatTokenAmount(record.expectedAmountOut)} ${ticker}`,
         tokenLine(record),
         txFull ? `tx: ${txFull}` : "",
       ]
@@ -139,4 +145,35 @@ export function buildTradeReply(
   }
 
   return stripUrls(text);
+}
+
+/**
+ * Compact success reply used when the full confirmed text is rejected by X
+ * (spam filters on long hex / financial wording).
+ */
+export function buildCompactConfirmedReply(record: TradeRecord): string {
+  const ticker = tickerLabel(record);
+  const tx = record.txHash ? shortenTx(record.txHash) : "";
+  return stripUrls(
+    [
+      pickSuccessHeadline(`${record.tweetId || ""}:compact`),
+      "",
+      `spent: ${record.requestedAmountMon} MON`,
+      `received: ${formatTokenAmount(record.expectedAmountOut)} ${ticker}`,
+      `token: ${shortenAddress(record.tokenAddress)}`,
+      tx ? `tx: ${tx}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+  );
+}
+
+/** True when X rejected a post because an identical reply already exists. */
+export function isDuplicateXReplyError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("duplicate") ||
+    lower.includes("you already said that") ||
+    lower.includes("status is a duplicate")
+  );
 }

@@ -21,7 +21,7 @@ import {
   type TradeRecord,
 } from "../trading/trade-record.js";
 import { TradeService } from "../trading/trade-service.js";
-import { buildTradeReply } from "../trading/replies.js";
+import { buildCompactConfirmedReply, buildTradeReply } from "../trading/replies.js";
 import { fetchTokenSymbol } from "../trading/token-meta.js";
 import { createProviders } from "../blockchain/nadfun/quote.js";
 import { createPublicBlockchainClient } from "../blockchain/client.js";
@@ -46,6 +46,8 @@ export type ProcessMentionRequest = {
 export type ProcessMentionResponse = {
   ok: boolean;
   replyText?: string;
+  /** Shorter confirmed reply if X rejects the full success text. */
+  fallbackReplyText?: string;
   status?: string;
   failureCode?: TradeErrorCode;
 };
@@ -450,6 +452,10 @@ export class TradeCoordinator implements DurableObject {
           result.record.status === "SUBMITTED" ||
           result.record.status === "CONFIRMED",
         replyText: result.replyText,
+        fallbackReplyText:
+          result.record.status === "CONFIRMED"
+            ? buildCompactConfirmedReply(result.record)
+            : undefined,
         status: result.record.status,
         failureCode: result.record.failureCode as TradeErrorCode | undefined,
       };
@@ -503,11 +509,20 @@ export class TradeCoordinator implements DurableObject {
     checked: number;
     confirmed: number;
     reverted: number;
-    replies: Array<{ tweetId: string; replyText: string; status: TradeRecord["status"] }>;
+    replies: Array<{
+      tweetId: string;
+      replyText: string;
+      fallbackReplyText?: string;
+      status: TradeRecord["status"];
+    }>;
   }> {
     const pending = await this.getPendingSubmitted();
-    const replies: Array<{ tweetId: string; replyText: string; status: TradeRecord["status"] }> =
-      [];
+    const replies: Array<{
+      tweetId: string;
+      replyText: string;
+      fallbackReplyText?: string;
+      status: TradeRecord["status"];
+    }> = [];
     let confirmed = 0;
     let reverted = 0;
 
@@ -532,6 +547,7 @@ export class TradeCoordinator implements DurableObject {
           replies.push({
             tweetId,
             replyText: buildTradeReply(record, "confirmed", this.env.MONAD_EXPLORER_TX_URL),
+            fallbackReplyText: buildCompactConfirmedReply(record),
             status: "CONFIRMED",
           });
         }
@@ -588,6 +604,7 @@ export class TradeCoordinator implements DurableObject {
           replies.push({
             tweetId,
             replyText: buildTradeReply(updated, "confirmed", this.env.MONAD_EXPLORER_TX_URL),
+            fallbackReplyText: buildCompactConfirmedReply(updated),
             status: "CONFIRMED",
           });
         } else {
