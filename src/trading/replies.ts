@@ -78,10 +78,10 @@ export function buildTradeReply(
 
     case "failed":
       return [
-        "trade failed before submission",
+        "trade failed before confirmation",
         "",
         `reason: ${record.failureMessageSafe ?? "execution failed"}`,
-        "no transaction was submitted",
+        "safe to retry with a new post",
       ].join("\n");
 
     case "unknown":
@@ -89,7 +89,11 @@ export function buildTradeReply(
         "trade status requires verification",
         "",
         "the network response was unclear after submission",
-        "the command will not be retried automatically",
-      ].join("\n");
+        "check your trading wallet before retrying",
+        record.txHash ? `tx: ${shortenAddress(record.txHash)}` : "",
+        explorerLine,
+      ]
+        .filter(Boolean)
+        .join("\n");
   }
 }

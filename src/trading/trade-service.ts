@@ -5,6 +5,7 @@ import type { AppEnv } from "../env.js";
 import { calculateMinimumAmountOut } from "../utils/bigint.js";
 import { isAllowlistedRouter } from "../utils/address.js";
 import { createTradeError, TradeError } from "./errors.js";
+import { isSubmissionTradeError } from "./submission-error.js";
 import type { QuoteProvider, SimulationProvider } from "../blockchain/nadfun/quote.js";
 import { createLiveExecutionContext } from "../blockchain/nadfun/quote.js";
 import { createTradeRecord, updateTradeRecord, type TradeRecord } from "./trade-record.js";
@@ -242,11 +243,16 @@ export class TradeService {
         committedAmountWei: input.amountInWei,
       };
     } catch (error) {
-      if (error instanceof TradeError && error.code === "SUBMISSION_UNKNOWN") {
+      if (
+        (isSubmissionTradeError(error) || error instanceof TradeError) &&
+        error.code === "SUBMISSION_UNKNOWN"
+      ) {
+        const txHash = isSubmissionTradeError(error) ? error.txHash : undefined;
         record = updateTradeRecord(record, {
           status: "UNKNOWN",
           failureCode: "SUBMISSION_UNKNOWN",
           failureMessageSafe: error.safeMessage,
+          txHash,
         });
         return {
           record,
@@ -260,10 +266,12 @@ export class TradeService {
       const reason =
         error instanceof TradeError ? error.safeMessage : "transaction submission failed";
       const code = error instanceof TradeError ? error.code : "SUBMISSION_FAILED";
+      const txHash = isSubmissionTradeError(error) ? error.txHash : undefined;
       record = updateTradeRecord(record, {
         status: "FAILED",
         failureCode: code,
         failureMessageSafe: reason,
+        txHash,
       });
 
       return {
