@@ -6,6 +6,21 @@ import { createTradeError } from "../trading/errors.js";
 import { createSubmissionError } from "../trading/submission-error.js";
 import { buildBuyTransaction } from "./nadfun/build-buy.js";
 
+/** Require a local private-key account — never eth_signTransaction over RPC. */
+function requireLocalSigner(walletClient: WalletClient) {
+  const account = walletClient.account;
+  if (!account || typeof account === "string" || account.type !== "local") {
+    throw createTradeError(
+      "CONFIGURATION_ERROR",
+      "local signer required — refusing RPC eth_signTransaction",
+    );
+  }
+  if (!account.signTransaction) {
+    throw createTradeError("CONFIGURATION_ERROR", "local signer cannot sign transactions");
+  }
+  return account;
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -87,8 +102,15 @@ export async function executeNadfunBuy(input: {
   let nonce: number | undefined;
 
   try {
+    // Pass the LocalAccount (not an address string). Address-only accounts make
+    // viem call eth_signTransaction on the RPC — public nodes reject that.
+    const account = requireLocalSigner(input.walletClient);
+    if (account.address.toLowerCase() !== input.walletAddress.toLowerCase()) {
+      throw createTradeError("CONFIGURATION_ERROR", "signer address mismatch");
+    }
+
     const request = await input.walletClient.prepareTransactionRequest({
-      account: input.walletAddress,
+      account,
       to: input.routerAddress,
       data,
       value: input.amountInWei,
@@ -97,9 +119,19 @@ export async function executeNadfunBuy(input: {
       chain: input.walletClient.chain,
     });
     nonce = typeof request.nonce === "number" ? request.nonce : undefined;
-    serialized = await input.walletClient.signTransaction(request);
+    // Sign with the local account API — never walletClient.signTransaction with
+    // an address-only account (that path hits eth_signTransaction on the node).
+    // Strip `account` from the prepared request; LocalAccount.signTransaction
+    // expects a TransactionSerializable payload only.
+    const { account: _account, ...unsigned } = request as typeof request & {
+      account?: unknown;
+    };
+    serialized = await account.signTransaction(
+      unsigned as Parameters<NonNullable<typeof account.signTransaction>>[0],
+    );
     hash = keccak256(serialized);
   } catch (error) {
+    if (error instanceof Error && "code" in error) throw error;
     const message = error instanceof Error ? error.message : "sign failed";
     throw createTradeError("SUBMISSION_FAILED", message.slice(0, 120));
   }

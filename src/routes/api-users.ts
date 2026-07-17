@@ -259,8 +259,14 @@ async function handleWithdraw(request: Request, env: Env): Promise<Response> {
   }
 
   try {
+    // Pass LocalAccount explicitly. An address string triggers eth_signTransaction
+    // on the RPC, which public Monad nodes do not support.
+    const account = walletClient.account;
+    if (!account || typeof account === "string" || account.type !== "local") {
+      return Response.json({ error: "signer_misconfigured" }, { status: 500 });
+    }
     const hash = await walletClient.sendTransaction({
-      account: walletAddress,
+      account,
       to: getAddress(toAddress) as `0x${string}`,
       value: amountWei,
       gas: gasLimit,
