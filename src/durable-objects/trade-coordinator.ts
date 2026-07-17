@@ -53,6 +53,10 @@ const CURSOR_KEY = "poll:cursor";
 const LIMITS_KEY = "limits:state";
 const PENDING_INDEX_KEY = "pending:submitted";
 
+function userTradesKey(authorId: string): string {
+  return `user:trades:${authorId}`;
+}
+
 export class TradeCoordinator implements DurableObject {
   private readonly state: DurableObjectState;
   private readonly env: Partial<AppEnv> & {
@@ -163,6 +167,16 @@ export class TradeCoordinator implements DurableObject {
       return Response.json({ ok: true });
     }
 
+    if (url.pathname === "/list-by-author" && request.method === "GET") {
+      const authorId = url.searchParams.get("authorId");
+      if (!authorId || !/^\d+$/.test(authorId)) {
+        return Response.json({ error: "invalid_author_id" }, { status: 400 });
+      }
+      const limit = Math.min(Number(url.searchParams.get("limit") ?? 50), 100);
+      const trades = await this.listTradesByAuthor(authorId, limit);
+      return Response.json({ trades });
+    }
+
     return new Response("not found", { status: 404 });
   }
 
@@ -203,6 +217,45 @@ export class TradeCoordinator implements DurableObject {
 
   private async saveTradeRecord(record: TradeRecord): Promise<void> {
     await this.state.storage.put(tradeRecordKey(record.tweetId), record);
+    await this.indexTradeForAuthor(record);
+  }
+
+  private async indexTradeForAuthor(record: TradeRecord): Promise<void> {
+    const key = userTradesKey(record.authorId);
+    const current = (await this.state.storage.get<string[]>(key)) ?? [];
+    if (!current.includes(record.tweetId)) {
+      // Newest first.
+      await this.state.storage.put(key, [record.tweetId, ...current].slice(0, 200));
+    }
+  }
+
+  private async listTradesByAuthor(authorId: string, limit: number): Promise<TradeRecord[]> {
+    const indexed = (await this.state.storage.get<string[]>(userTradesKey(authorId))) ?? [];
+    const trades: TradeRecord[] = [];
+
+    if (indexed.length > 0) {
+      for (const tweetId of indexed.slice(0, limit)) {
+        const record = await this.getTradeRecord(tweetId);
+        if (record) trades.push(record);
+      }
+      return trades;
+    }
+
+    // Fallback scan for trades created before the per-user index existed.
+    const listed = await this.state.storage.list<TradeRecord>({ prefix: "trade:v1:tweet:" });
+    const matched: TradeRecord[] = [];
+    for (const record of listed.values()) {
+      if (record.authorId === authorId) matched.push(record);
+    }
+    matched.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    const slice = matched.slice(0, limit);
+    if (slice.length > 0) {
+      await this.state.storage.put(
+        userTradesKey(authorId),
+        slice.map((t) => t.tweetId),
+      );
+    }
+    return slice;
   }
 
   private async getPendingSubmitted(): Promise<string[]> {
