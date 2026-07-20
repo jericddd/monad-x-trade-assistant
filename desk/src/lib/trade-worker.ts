@@ -77,6 +77,8 @@ export type PortfolioHolding = {
   lastStatus: string;
   lastTxHash?: string;
   lastAt?: string;
+  venue?: "nadfun" | "flap" | "uniswap";
+  venueLabel?: string;
 };
 
 export type PortfolioTrade = {
