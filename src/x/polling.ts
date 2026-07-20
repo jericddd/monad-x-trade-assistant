@@ -1,6 +1,7 @@
 import type { AppEnv } from "../env.js";
 import type { XClient } from "./client.js";
 import { processMentionReplies } from "./replies.js";
+import { isGameCommand, isPotentialCommand } from "./mentions.js";
 import { logError, logInfo } from "../utils/logging.js";
 import type { ProcessMentionResponse } from "../durable-objects/trade-coordinator.js";
 
@@ -106,8 +107,20 @@ export async function pollMentions(env: AppEnv, client: XClient): Promise<PollRe
       status?: string;
     }> = [];
 
+    const botUsername = botUser.username || env.X_BOT_USERNAME || "monexmonad";
+
     for (const tweet of mentions.tweets) {
       try {
+        // Shared @monexmonad with MonEx game — never touch catch / open pack / non-buy chatter.
+        if (isGameCommand(tweet.text) || !isPotentialCommand(tweet.text, botUsername)) {
+          logInfo("mention_skipped_non_buy", {
+            tweetId: tweet.id,
+            authorId: tweet.authorId,
+            game: isGameCommand(tweet.text),
+          });
+          continue;
+        }
+
         const result = await processThroughCoordinator(stub, {
           tweetId: tweet.id,
           authorId: tweet.authorId,
