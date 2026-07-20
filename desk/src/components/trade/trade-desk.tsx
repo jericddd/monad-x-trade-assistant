@@ -10,6 +10,7 @@ import {
   useWaitForTransactionReceipt,
   useSignMessage,
 } from "wagmi";
+import { useAppKit } from "@reown/appkit/react";
 import { createPublicClient, formatEther, http, parseEther } from "viem";
 import {
   AppWindow,
@@ -210,7 +211,8 @@ function formatActivityWhen(iso: string): string {
 
 function hasPositiveBalance(value: string | null | undefined): boolean {
   const n = Number(value);
-  return Number.isFinite(n) && n > 0;
+  // Ignore dust left after 100% sells / rounding.
+  return Number.isFinite(n) && n > 1e-8;
 }
 
 /** Leave 1 MON for gas when using Max on add funds / cash out / buy. */
@@ -228,10 +230,12 @@ function maxSpendableMon(
 export function TradeDesk() {
   const { user, loading: authLoading, logout } = useAuth();
   const { address, isConnected, chainId } = useAccount();
-  const { connect, connectors, isPending: connecting } = useConnect();
+  const { isPending: connecting } = useConnect();
+  const { open } = useAppKit();
   const { disconnect } = useDisconnect();
   const { switchChainAsync } = useSwitchChain();
   const { signMessageAsync } = useSignMessage();
+
   const { sendTransactionAsync, data: depositHash, isPending: depositing } = useSendTransaction();
   const depositReceipt = useWaitForTransactionReceipt({ hash: depositHash });
 
@@ -557,9 +561,8 @@ export function TradeDesk() {
       await ensureMonad();
       if (direction === "deposit") {
         if (!isConnected || !address) {
-          const connector = connectors[0];
-          if (connector) connect({ connector });
-          throw new Error("Approve the wallet connection, then tap Add funds again");
+          openWalletPicker();
+          throw new Error("Connect your personal wallet, then tap Add funds again");
         }
         const hash = await sendTransactionAsync({
           to: account.account.inSiteWallet,
@@ -669,11 +672,44 @@ export function TradeDesk() {
         message?: string;
       };
       if (!res.ok || data.ok === false) {
-        throw new Error(data.message ?? data.error ?? "Trade failed");
+        const err = data.message ?? data.error ?? "Trade failed";
+        if (data.txHash) {
+          setTxUrl(getExplorerTxUrl(data.txHash));
+        }
+        throw new Error(err);
+      }
+
+      const confirmed =
+        data.dryRun ||
+        data.status === "DRY_RUN_SUCCESS" ||
+        data.status === "CONFIRMED";
+      if (!confirmed) {
+        throw new Error(
+          data.status === "SUBMITTED"
+            ? "Trade submitted but not confirmed yet — check Activity / explorer"
+            : `Trade not confirmed (${data.status ?? "unknown"})`,
+        );
       }
 
       const ticker = (data.tokenSymbol ?? symbol ?? "TOKEN").replace(/^\$/, "");
       const explorerUrl = data.txHash ? getExplorerTxUrl(data.txHash) : null;
+
+      // Optimistic portfolio update so a full sell disappears immediately.
+      if (action === "sell") {
+        const token = tradeModal.tokenAddress.toLowerCase();
+        setHoldings((prev) =>
+          prev
+            .map((h) => {
+              if (h.tokenAddress.toLowerCase() !== token) return h;
+              if (percent >= 100) return { ...h, balance: "0" };
+              const bal = Number(h.balance);
+              if (!Number.isFinite(bal)) return h;
+              return { ...h, balance: String(Math.max(0, bal * (1 - percent / 100))) };
+            })
+            .filter((h) => hasPositiveBalance(h.balance)),
+        );
+      }
+
       setTradeModal(null);
       setTradeSuccess({
         action,
@@ -691,7 +727,10 @@ export function TradeDesk() {
       setTxUrl(explorerUrl);
       await refreshAccount({ silent: true });
       await refreshPortfolio(activityPage, { silent: true });
-    } catch (error) {
+      // Chain balance can lag briefly after confirm — refresh again shortly.
+      window.setTimeout(() => {
+        void refreshPortfolio(activityPage, { silent: true });
+      }, 4000);    } catch (error) {
       setStatus(error instanceof Error ? error.message : "Trade failed");
     } finally {
       setTradeBusy(false);
@@ -756,6 +795,11 @@ export function TradeDesk() {
     }
   }
 
+  function openWalletPicker() {
+    setStatus(null);
+    void open({ view: "Connect" });
+  }
+
   const linked = Boolean(account?.linked && account.account);
 
   if (authLoading || (user && !accountReady)) {
@@ -777,7 +821,7 @@ export function TradeDesk() {
             Buy from X.
           </h1>
           <p className="mx-auto max-w-sm text-base leading-relaxed text-mx-muted">
-            Log in, add MON once, then tweet{" "}
+            Log in, add MON, then tweet{" "}
             <span className="text-mx-text">@monexmonad buy …</span> to trade.
           </p>
         </header>
@@ -841,10 +885,7 @@ export function TradeDesk() {
               className="w-full"
               size="lg"
               loading={connecting}
-              onClick={() => {
-                const connector = connectors[0];
-                if (connector) connect({ connector });
-              }}
+              onClick={() => openWalletPicker()}
             >
               <Wallet className="h-4 w-4" /> Connect wallet
             </Button>
@@ -947,11 +988,28 @@ export function TradeDesk() {
                     </button>
                   ) : null}
                 </div>
-                <p className="mt-1.5 font-display text-xl font-bold text-mx-text">{yourBal}</p>
-                <p className="text-[11px] text-mx-muted">MON</p>
-                <p className="mt-1.5 font-mono text-[10px] text-mx-muted">
-                  {shortAddr(account!.account!.connectedWallet)}
+                <p className="mt-1.5 font-display text-xl font-bold text-mx-text">
+                  {isConnected ? yourBal : "—"}
                 </p>
+                <p className="text-[11px] text-mx-muted">MON</p>
+                {isConnected ? (
+                  <p className="mt-1.5 font-mono text-[10px] text-mx-muted">
+                    {shortAddr(address ?? account!.account!.connectedWallet)}
+                  </p>
+                ) : (
+                  <div className="mt-2 space-y-1.5">
+                    <p className="text-[10px] text-mx-muted">Connect personal wallet</p>
+                    <button
+                      type="button"
+                      disabled={connecting}
+                      onClick={() => openWalletPicker()}
+                      className="inline-flex w-full items-center justify-center gap-1 rounded-md bg-mx-accent/15 px-2 py-1.5 text-[10px] font-semibold text-mx-accent transition hover:bg-mx-accent/25 disabled:opacity-50"
+                    >
+                      <Wallet className="h-3 w-3 shrink-0" />
+                      Connect
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="rounded-xl border border-mx-accent/40 bg-mx-surface-2 p-3 ring-1 ring-mx-accent/20">
                 <div className="flex flex-col gap-2">
@@ -1101,13 +1159,10 @@ export function TradeDesk() {
               {!isConnected && direction === "deposit" ? (
                 <button
                   type="button"
-                  onClick={() => {
-                    const connector = connectors[0];
-                    if (connector) connect({ connector });
-                  }}
+                  onClick={() => openWalletPicker()}
                   className="w-full text-center text-[11px] text-mx-muted underline-offset-2 hover:underline"
                 >
-                  Browser wallet disconnected — tap to reconnect
+                  Connect personal wallet to add funds
                 </button>
               ) : null}
             </div>

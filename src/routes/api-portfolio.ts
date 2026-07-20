@@ -1,6 +1,11 @@
 import { formatUnits, getAddress, type Hex } from "viem";
 import type { Env } from "../worker.js";
 import { createPublicBlockchainClient } from "../blockchain/client.js";
+import {
+  normalizeLinkedUser,
+  type LinkedUserRecord,
+  type PublicLinkedUser,
+} from "../custodial/types.js";
 import { parseEnvLenient } from "../env.js";
 import type { TradeRecord } from "../trading/trade-record.js";
 import { assertSiteSecret, listTransfersViaRegistry } from "./api-users.js";
@@ -74,6 +79,18 @@ function coordinatorStub(env: Env): DurableObjectStub {
   return env.TRADE_COORDINATOR.get(env.TRADE_COORDINATOR.idFromName("primary"));
 }
 
+function registryStub(env: Env): DurableObjectStub {
+  return env.USER_REGISTRY.get(env.USER_REGISTRY.idFromName("primary"));
+}
+
+async function fetchLinkedUser(env: Env, xUserId: string): Promise<LinkedUserRecord | null> {
+  const stub = registryStub(env);
+  const res = await stub.fetch(`https://registry/get?xUserId=${encodeURIComponent(xUserId)}`);
+  const body = (await res.json()) as { user: PublicLinkedUser | null };
+  if (!body.user) return null;
+  return normalizeLinkedUser(body.user);
+}
+
 export async function handlePortfolioApi(request: Request, env: Env): Promise<Response | null> {
   const url = new URL(request.url);
   const match = url.pathname.match(/^\/api\/v1\/users\/(\d+)\/portfolio$/);
@@ -95,6 +112,7 @@ export async function handlePortfolioApi(request: Request, env: Env): Promise<Re
   const body = (await res.json()) as { trades?: TradeRecord[] };
   const trades = body.trades ?? [];
   const transfers = await listTransfersViaRegistry(env, xUserId, 200);
+  const linkedUser = await fetchLinkedUser(env, xUserId);
 
   // Holdings only from real buys (dry-run never received tokens on-chain).
   const successStatuses = new Set(["CONFIRMED", "SUBMITTED"]);
@@ -109,26 +127,34 @@ export async function handlePortfolioApi(request: Request, env: Env): Promise<Re
 
   for (const trade of trades) {
     if (!successStatuses.has(trade.status)) continue;
+    // Fully sold tokens stay in trade history but shouldn't seed empty holdings.
+    if (trade.action === "sell") {
+      const key = trade.tokenAddress.toLowerCase();
+      const prev = byToken.get(key);
+      if (prev && trade.createdAt > prev.last.createdAt) prev.last = trade;
+      continue;
+    }
     const key = trade.tokenAddress.toLowerCase();
     const prev = byToken.get(key);
-    const isSell = trade.action === "sell";
-    const spent = isSell ? 0 : Number(trade.requestedAmountMon) || 0;
+    const spent = Number(trade.requestedAmountMon) || 0;
     if (!prev) {
       byToken.set(key, {
-        buys: isSell ? 0 : 1,
+        buys: 1,
         spentMon: spent,
         last: trade,
       });
     } else {
-      if (!isSell) {
-        prev.buys += 1;
-        prev.spentMon += spent;
-      }
+      prev.buys += 1;
+      prev.spentMon += spent;
       if (trade.createdAt > prev.last.createdAt) prev.last = trade;
     }
   }
 
-  const walletAddress = trades.find((t) => t.walletAddress)?.walletAddress;
+  // Always prefer the current trading wallet — older trades may point at a renewed address.
+  const walletAddress =
+    linkedUser?.inSiteWallet ??
+    [...trades].reverse().find((t) => t.walletAddress)?.walletAddress ??
+    trades.find((t) => t.walletAddress)?.walletAddress;
   const holdings: PortfolioHolding[] = [];
 
   if (byToken.size > 0 && walletAddress) {
@@ -141,6 +167,7 @@ export async function handlePortfolioApi(request: Request, env: Env): Promise<Re
         let symbol = shortSymbol(tokenAddress);
         let decimals = 18;
         let balance = "0";
+        let balanceWei = 0n;
         try {
           const [bal, dec, sym] = await Promise.all([
             publicClient.readContract({
@@ -162,10 +189,13 @@ export async function handlePortfolioApi(request: Request, env: Env): Promise<Re
           ]);
           decimals = Number(dec);
           symbol = String(sym);
-          balance = formatUnits(bal as bigint, decimals);
+          balanceWei = bal as bigint;
+          balance = formatUnits(balanceWei, decimals);
         } catch {
           // Token metadata/balance is best-effort.
         }
+        // Hide fully sold / dust positions from Portfolio.
+        if (balanceWei <= 0n) continue;
         holdings.push({
           tokenAddress,
           symbol,
@@ -179,20 +209,7 @@ export async function handlePortfolioApi(request: Request, env: Env): Promise<Re
         });
       }
     } catch {
-      for (const [token, agg] of byToken) {
-        const tokenAddress = getAddress(token) as `0x${string}`;
-        holdings.push({
-          tokenAddress,
-          symbol: shortSymbol(tokenAddress),
-          decimals: 18,
-          balance: "0",
-          buys: agg.buys,
-          spentMon: agg.spentMon.toFixed(4).replace(/\.?0+$/, ""),
-          lastStatus: agg.last.status,
-          lastTxHash: agg.last.txHash,
-          lastAt: agg.last.createdAt,
-        });
-      }
+      // If chain reads fail entirely, omit holdings rather than showing stale zeros.
     }
   }
 

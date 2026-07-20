@@ -210,10 +210,10 @@ export class AppTradeService {
       throw createTradeError("TRADING_DISABLED");
     }
 
-    // Gas cushion for approve + sell.
+    // Gas cushion for approve + sell (V2 sells can exceed 300k).
     const nativeBal = await getNativeBalance(live.publicClient, live.walletAddress);
     const gasPrice = await live.publicClient.getGasPrice();
-    const estimatedGasCost = gasPrice * 350_000n;
+    const estimatedGasCost = gasPrice * 700_000n;
     if (nativeBal < estimatedGasCost + live.minReserveWei) {
       throw createTradeError("MINIMUM_RESERVE_VIOLATION", "need MON for gas");
     }
@@ -231,15 +231,16 @@ export class AppTradeService {
         routerAddress: quote.routerAddress,
         deadline,
         allowedRouters,
-        gas: 300_000n,
+        // Gas limit is estimated inside executeNadfunSell (floor 450k).
+        // Gas price stays network default + 12% — not a high custom fee.
         gasPrice,
       });
 
-      record = updateTradeRecord(record, { status: "SUBMITTED", txHash });
+      record = updateTradeRecord(record, { status: "CONFIRMED", txHash });
       return {
         record,
-        replyKind: "submitted",
-        replyText: buildTradeReply(record, "submitted", this.env.MONAD_EXPLORER_TX_URL),
+        replyKind: "confirmed",
+        replyText: buildTradeReply(record, "confirmed", this.env.MONAD_EXPLORER_TX_URL),
       };
     } catch (error) {
       return this.mapLiveFailure(record, error);
