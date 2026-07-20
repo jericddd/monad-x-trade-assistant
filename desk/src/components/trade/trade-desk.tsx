@@ -171,12 +171,13 @@ const VENUE_META: Record<
   uniswap: { label: "Uniswap", src: "/brand/uniswap-logo.png", fallback: "U" },
 };
 
-/** Small deployer badge after ticker — hover shows venue name. */
+/** Small deployer badge after ticker — hover shows "Deployed from …". */
 function VenueBadge({ venue, label }: { venue?: TokenVenue | null; label?: string }) {
   const [failed, setFailed] = useState(false);
   if (!venue) return null;
   const meta = VENUE_META[venue];
-  const title = label ?? meta.label;
+  const appName = label ?? meta.label;
+  const title = `Deployed from ${appName}`;
 
   return (
     <span className="group/venue relative inline-flex shrink-0" aria-label={title}>
@@ -195,7 +196,7 @@ function VenueBadge({ venue, label }: { venue?: TokenVenue | null; label?: strin
       )}
       <span
         role="tooltip"
-        className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-mx-text px-2 py-1 text-[10px] font-medium text-mx-bg opacity-0 shadow-sm transition-opacity duration-150 group-hover/venue:opacity-100"
+        className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md border border-mx-border bg-[#0a1613] px-2 py-1 text-[10px] font-semibold text-[#e8fff6] opacity-0 shadow-lg transition-opacity duration-150 group-hover/venue:opacity-100"
       >
         {title}
       </span>
