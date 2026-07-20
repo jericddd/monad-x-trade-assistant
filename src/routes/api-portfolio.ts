@@ -4,6 +4,8 @@ import { createPublicBlockchainClient } from "../blockchain/client.js";
 import { parseEnvLenient } from "../env.js";
 import type { TradeRecord } from "../trading/trade-record.js";
 import { assertSiteSecret, listTransfersViaRegistry } from "./api-users.js";
+import { detectTokenVenue, venueFromRouter, VENUE_LABELS } from "../blockchain/venues/detect.js";
+import { NADFUN_MAINNET } from "../blockchain/nadfun/config.js";
 
 const ERC20_ABI = [
   {
@@ -46,6 +48,9 @@ export type PortfolioHolding = {
   lastStatus: string;
   lastTxHash?: string;
   lastAt?: string;
+  /** Deployer / origin: nadfun | flap | uniswap */
+  venue?: "nadfun" | "flap" | "uniswap";
+  venueLabel?: string;
 };
 
 export type PortfolioActivity = {
@@ -132,10 +137,10 @@ export async function handlePortfolioApi(request: Request, env: Env): Promise<Re
   const holdings: PortfolioHolding[] = [];
 
   if (byToken.size > 0 && walletAddress) {
+    const parsedEnv = parseEnvLenient(env as unknown as Record<string, unknown>);
     try {
-      const publicClient = createPublicBlockchainClient(
-        parseEnvLenient(env as unknown as Record<string, unknown>),
-      );
+      const publicClient = createPublicBlockchainClient(parsedEnv);
+      const lensAddress = parsedEnv.NADFUN_LENS_ADDRESS ?? NADFUN_MAINNET.LENS;
       for (const [token, agg] of byToken) {
         const tokenAddress = getAddress(token) as `0x${string}`;
         let symbol = shortSymbol(tokenAddress);
@@ -166,6 +171,24 @@ export async function handlePortfolioApi(request: Request, env: Env): Promise<Re
         } catch {
           // Token metadata/balance is best-effort.
         }
+
+        let venue: PortfolioHolding["venue"];
+        let venueLabel: string | undefined;
+        try {
+          const detected = await detectTokenVenue({
+            publicClient,
+            tokenAddress,
+            lensAddress,
+            routerHint: agg.last.routerAddress,
+          });
+          if (detected) {
+            venue = detected;
+            venueLabel = VENUE_LABELS[detected];
+          }
+        } catch {
+          // Venue badge is best-effort.
+        }
+
         holdings.push({
           tokenAddress,
           symbol,
@@ -176,11 +199,14 @@ export async function handlePortfolioApi(request: Request, env: Env): Promise<Re
           lastStatus: agg.last.status,
           lastTxHash: agg.last.txHash,
           lastAt: agg.last.createdAt,
+          venue,
+          venueLabel,
         });
       }
     } catch {
       for (const [token, agg] of byToken) {
         const tokenAddress = getAddress(token) as `0x${string}`;
+        const fromRouter = venueFromRouter(agg.last.routerAddress);
         holdings.push({
           tokenAddress,
           symbol: shortSymbol(tokenAddress),
@@ -191,6 +217,8 @@ export async function handlePortfolioApi(request: Request, env: Env): Promise<Re
           lastStatus: agg.last.status,
           lastTxHash: agg.last.txHash,
           lastAt: agg.last.createdAt,
+          venue: fromRouter ?? undefined,
+          venueLabel: fromRouter ? VENUE_LABELS[fromRouter] : undefined,
         });
       }
     }

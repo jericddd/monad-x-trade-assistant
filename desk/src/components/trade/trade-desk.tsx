@@ -33,7 +33,9 @@ import {
   getExplorerAddressUrl,
   getExplorerTxUrl,
   getNadFunTokenUrl,
+  getVenueTokenUrl,
   monadMainnet,
+  type TokenVenue,
 } from "@/lib/monad-chain";
 
 const publicBalanceClient = createPublicClient({
@@ -92,6 +94,8 @@ type PortfolioHolding = {
   lastStatus: string;
   lastTxHash?: string;
   lastAt?: string;
+  venue?: TokenVenue;
+  venueLabel?: string;
 };
 
 type PortfolioTrade = {
@@ -154,6 +158,47 @@ function TokenLogo({
       className="h-8 w-8 shrink-0 rounded-full bg-mx-surface-2 object-cover"
       onError={() => setFailed(true)}
     />
+  );
+}
+
+const VENUE_META: Record<
+  TokenVenue,
+  { label: string; src: string; fallback: string }
+> = {
+  nadfun: { label: "Nad.fun", src: "/brand/nadfun-logo.png", fallback: "N" },
+  flap: { label: "Flap.sh", src: "/brand/flap-logo.png", fallback: "F" },
+  uniswap: { label: "Uniswap", src: "/brand/uniswap-logo.png", fallback: "U" },
+};
+
+/** Small deployer badge after ticker — hover shows venue name. */
+function VenueBadge({ venue, label }: { venue?: TokenVenue | null; label?: string }) {
+  const [failed, setFailed] = useState(false);
+  if (!venue) return null;
+  const meta = VENUE_META[venue];
+  const title = label ?? meta.label;
+
+  return (
+    <span className="group/venue relative inline-flex shrink-0" aria-label={title}>
+      {failed ? (
+        <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-mx-surface text-[8px] font-bold text-mx-muted ring-1 ring-mx-border">
+          {meta.fallback}
+        </span>
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={meta.src}
+          alt=""
+          className="h-3.5 w-3.5 rounded-full object-cover ring-1 ring-mx-border/80"
+          onError={() => setFailed(true)}
+        />
+      )}
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-mx-text px-2 py-1 text-[10px] font-medium text-mx-bg opacity-0 shadow-sm transition-opacity duration-150 group-hover/venue:opacity-100"
+      >
+        {title}
+      </span>
+    </span>
   );
 }
 
@@ -1147,14 +1192,17 @@ export function TradeDesk() {
                       <TokenLogo address={h.tokenAddress} symbol={h.symbol} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="truncate text-sm font-semibold text-mx-text">{h.symbol}</p>
+                          <p className="flex min-w-0 items-center gap-1.5 text-sm font-semibold text-mx-text">
+                            <span className="truncate">{h.symbol}</span>
+                            <VenueBadge venue={h.venue} label={h.venueLabel} />
+                          </p>
                           <p className="shrink-0 font-mono text-sm text-mx-accent">
                             {formatMon(h.balance)}
                           </p>
                         </div>
                         <div className="mt-0.5 flex items-center justify-between gap-2 text-[11px] text-mx-muted">
                           <a
-                            href={getNadFunTokenUrl(h.tokenAddress)}
+                            href={getVenueTokenUrl(h.tokenAddress, h.venue)}
                             target="_blank"
                             rel="noreferrer"
                             className="font-mono hover:text-mx-accent"

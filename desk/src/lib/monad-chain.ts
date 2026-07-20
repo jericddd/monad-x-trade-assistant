@@ -38,3 +38,18 @@ export function getExplorerAddressUrl(address: string): string {
 export function getNadFunTokenUrl(tokenAddress: string): string {
   return `https://nad.fun/tokens/${tokenAddress}`;
 }
+
+export type TokenVenue = "nadfun" | "flap" | "uniswap";
+
+/** Token page on the venue that deployed / hosts the token. */
+export function getVenueTokenUrl(tokenAddress: string, venue?: TokenVenue | null): string {
+  switch (venue) {
+    case "flap":
+      return `https://flap.sh/monad/${tokenAddress}`;
+    case "uniswap":
+      return `https://app.uniswap.org/explore/tokens/monad/${tokenAddress}`;
+    case "nadfun":
+    default:
+      return getNadFunTokenUrl(tokenAddress);
+  }
+}
