@@ -1,6 +1,6 @@
 # MonEx Trade Assistant
 
-Buy Nad.fun tokens on **Monad mainnet** by mentioning [@monexmonad](https://x.com/monexmonad) on X. Fund a custodial trading wallet on the web desk, then trade from X (or buy/sell held tokens on the desk).
+Buy tokens on **Monad mainnet** (Nad.fun, Flap.sh, Uniswap V2/V3) by mentioning [@monexmonad](https://x.com/monexmonad) on X. Fund a custodial trading wallet on the web desk, then trade from X (or buy/sell held tokens on the desk).
 
 **This is the only product repo** (worker + web desk).
 
@@ -24,7 +24,7 @@ Buy Nad.fun tokens on **Monad mainnet** by mentioning [@monexmonad](https://x.co
 
 1. Sign in with X on the desk → link a browser wallet → fund an in-site trading wallet
 2. Post on X: `@monexmonad buy <amount> mon <tokenAddress>`
-3. Worker quotes Nad.fun, simulates, signs locally, broadcasts on Monad
+3. Worker auto-detects venue (Nad.fun → Flap.sh → Uniswap), quotes, simulates, signs locally, broadcasts on Monad
 4. Bot replies once after confirmation (spent / received — no URLs or `0x` hex; X blocks crypto addresses for new app auth)
 5. Desk shows live portfolio, activity, add-funds / cash-out, and buy/sell for held tokens
 
@@ -41,7 +41,7 @@ Buy Nad.fun tokens on **Monad mainnet** by mentioning [@monexmonad](https://x.co
 - Local transaction signing (never `eth_signTransaction` on public RPC)
 - Site APIs under `/api/v1/users/*` for [trade.monexmonad.xyz](https://trade.monexmonad.xyz)
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/VENUES.md](docs/VENUES.md).
 
 ## Deploy
 

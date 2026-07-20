@@ -133,6 +133,7 @@ export class TradeService {
       routerAddress: quote.routerAddress,
       recipient: this.walletAddress,
       deadline,
+      fee: quote.fee,
     });
 
     if (!simulation.ok) {
@@ -156,6 +157,7 @@ export class TradeService {
       routerAddress: quote.routerAddress,
       deadline,
       allowedRouters,
+      fee: quote.fee,
     });
   }
 
@@ -167,6 +169,7 @@ export class TradeService {
     routerAddress: `0x${string}`;
     deadline: bigint;
     allowedRouters: `0x${string}`[];
+    fee?: number;
   }): Promise<TradeExecutionResult> {
     // Re-check emergency stop immediately before signing.
     if (this.env.TRADING_ENABLED !== true || this.env.TRADE_DRY_RUN !== false) {
@@ -189,6 +192,8 @@ export class TradeService {
       recipient: live.walletAddress,
       deadline: input.deadline,
       routerAddress: input.routerAddress,
+      amountInWei: input.amountInWei,
+      fee: input.fee,
     });
 
     let gasEstimate: { gas: bigint; gasPrice: bigint; estimatedCost: bigint };
@@ -243,6 +248,7 @@ export class TradeService {
         allowedRouters: input.allowedRouters,
         gas: gasEstimate.gas,
         gasPrice: gasEstimate.gasPrice,
+        fee: input.fee,
       });
 
       record = updateTradeRecord(record, {

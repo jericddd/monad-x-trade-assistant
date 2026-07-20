@@ -191,6 +191,7 @@ export class AppTradeService {
         routerAddress: quote.routerAddress,
         recipient: live.walletAddress,
         deadline,
+        fee: quote.fee,
       });
       if (!simulation.ok) {
         throw createTradeError("SIMULATION_FAILED", simulation.reason);
@@ -233,6 +234,7 @@ export class AppTradeService {
         allowedRouters,
         gas: 300_000n,
         gasPrice,
+        fee: quote.fee,
       });
 
       record = updateTradeRecord(record, { status: "SUBMITTED", txHash });
@@ -314,6 +316,7 @@ export class AppTradeService {
       routerAddress: quote.routerAddress,
       recipient: this.walletAddress,
       deadline,
+      fee: quote.fee,
     });
     if (!simulation.ok) {
       throw createTradeError("SIMULATION_FAILED", simulation.reason);
@@ -339,6 +342,8 @@ export class AppTradeService {
       recipient: live.walletAddress,
       deadline,
       routerAddress: quote.routerAddress,
+      amountInWei: input.amountWei,
+      fee: quote.fee,
     });
 
     let gasEstimate: { gas: bigint; gasPrice: bigint; estimatedCost: bigint };
@@ -388,6 +393,7 @@ export class AppTradeService {
         allowedRouters,
         gas: gasEstimate.gas,
         gasPrice: gasEstimate.gasPrice,
+        fee: quote.fee,
       });
       record = updateTradeRecord(record, { status: "SUBMITTED", txHash });
       return {
