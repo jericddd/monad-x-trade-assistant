@@ -30,6 +30,7 @@ import { getAddress, parseEther } from "viem";
 import { logInfo, logWarn } from "../utils/logging.js";
 import type { LinkedUserRecord } from "../custodial/types.js";
 import { resolveSignerForAuthor } from "../custodial/resolve-signer.js";
+import { shouldReplyToInvalidCommand } from "../x/mentions.js";
 
 type CoordinatorState = {
   limits: LimitState;
@@ -314,10 +315,17 @@ export class TradeCoordinator implements DurableObject {
 
     const parsed = parseBuyCommand(input.text, botUsername);
     if (!parsed.ok) {
+      // Game commands (catch / open pack) and other non-buy chatter share @monexmonad.
+      // Only reply when the user clearly attempted a buy — otherwise stay silent so
+      // monex-api can own the catch success reply without a duplicate trade reject.
+      const replyOnFail =
+        parsed.reason !== "INVALID_COMMAND" || shouldReplyToInvalidCommand(input.text, botUsername);
       return {
         ok: false,
         failureCode: parsed.reason,
-        replyText: `trade rejected\n\nreason: ${SAFE_ERROR_MESSAGES[parsed.reason]}`,
+        replyText: replyOnFail
+          ? `trade rejected\n\nreason: ${SAFE_ERROR_MESSAGES[parsed.reason]}`
+          : undefined,
       };
     }
 
