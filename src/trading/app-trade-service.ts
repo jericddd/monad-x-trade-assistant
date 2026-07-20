@@ -191,6 +191,7 @@ export class AppTradeService {
         routerAddress: quote.routerAddress,
         recipient: live.walletAddress,
         deadline,
+        fee: quote.fee,
       });
       if (!simulation.ok) {
         throw createTradeError("SIMULATION_FAILED", simulation.reason);
@@ -234,6 +235,7 @@ export class AppTradeService {
         // Gas limit is estimated inside executeNadfunSell (floor 450k).
         // Gas price stays network default + 12% — not a high custom fee.
         gasPrice,
+        fee: quote.fee,
       });
 
       record = updateTradeRecord(record, { status: "CONFIRMED", txHash });
@@ -315,6 +317,7 @@ export class AppTradeService {
       routerAddress: quote.routerAddress,
       recipient: this.walletAddress,
       deadline,
+      fee: quote.fee,
     });
     if (!simulation.ok) {
       throw createTradeError("SIMULATION_FAILED", simulation.reason);
@@ -340,6 +343,8 @@ export class AppTradeService {
       recipient: live.walletAddress,
       deadline,
       routerAddress: quote.routerAddress,
+      amountInWei: input.amountWei,
+      fee: quote.fee,
     });
 
     let gasEstimate: { gas: bigint; gasPrice: bigint; estimatedCost: bigint };
@@ -389,6 +394,7 @@ export class AppTradeService {
         allowedRouters,
         gas: gasEstimate.gas,
         gasPrice: gasEstimate.gasPrice,
+        fee: quote.fee,
       });
       record = updateTradeRecord(record, { status: "SUBMITTED", txHash });
       return {

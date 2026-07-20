@@ -12,11 +12,17 @@ import { simulateSellTransaction } from "./simulate-sell.js";
 import { privateKeyToAccount } from "viem/accounts";
 import type { Hex } from "viem";
 
+export type TradeVenue = "nadfun" | "flap" | "uniswap-v2" | "uniswap-v3";
+
 export type QuoteResult = {
   routerAddress: `0x${string}`;
   expectedAmountOut: bigint;
   isLocked: boolean;
   hasBytecode: boolean;
+  /** Which venue produced this quote (for calldata / UX). */
+  venue?: TradeVenue;
+  /** Uniswap V3 fee tier when venue is uniswap-v3. */
+  fee?: number;
 };
 
 export interface QuoteProvider {
@@ -32,6 +38,7 @@ export interface SimulationProvider {
     routerAddress: `0x${string}`;
     recipient: `0x${string}`;
     deadline: bigint;
+    fee?: number;
   }): Promise<{ ok: true } | { ok: false; reason: string }>;
   simulateSell?(input: {
     tokenAddress: `0x${string}`;
@@ -40,6 +47,7 @@ export interface SimulationProvider {
     routerAddress: `0x${string}`;
     recipient: `0x${string}`;
     deadline: bigint;
+    fee?: number;
   }): Promise<{ ok: true } | { ok: false; reason: string }>;
 }
 
@@ -145,9 +153,10 @@ export class RealQuoteProvider implements QuoteProvider {
     private readonly publicClient = createPublicBlockchainClient(env),
   ) {}
 
-  async getBuyQuote(input: {
+  private async quoteAcrossVenues(input: {
     tokenAddress: `0x${string}`;
     amountInWei: bigint;
+    isBuy: boolean;
   }): Promise<QuoteResult> {
     await assertConfiguredChainId(this.publicClient, this.env.MONAD_CHAIN_ID ?? 143);
 
@@ -165,71 +174,109 @@ export class RealQuoteProvider implements QuoteProvider {
       };
     }
 
-    const lensAddress = this.env.NADFUN_LENS_ADDRESS ?? NADFUN_MAINNET.LENS;
-    const quote = await queryLensQuote({
-      publicClient: this.publicClient,
-      lensAddress,
-      tokenAddress: input.tokenAddress,
-      amountInWei: input.amountInWei,
-    });
+    // 1) Nad.fun (V1 Lens → V2 router)
+    try {
+      const lensAddress = this.env.NADFUN_LENS_ADDRESS ?? NADFUN_MAINNET.LENS;
+      const quote = await queryLensQuote({
+        publicClient: this.publicClient,
+        lensAddress,
+        tokenAddress: input.tokenAddress,
+        amountInWei: input.amountInWei,
+        isBuy: input.isBuy,
+      });
+      const untradeable = await isTokenUntradeable({
+        publicClient: this.publicClient,
+        lensAddress,
+        tokenAddress: input.tokenAddress,
+      });
+      if (quote.expectedAmountOut > 0n && !untradeable) {
+        return {
+          routerAddress: quote.routerAddress,
+          expectedAmountOut: quote.expectedAmountOut,
+          isLocked: false,
+          hasBytecode: true,
+          venue: "nadfun",
+        };
+      }
+      if (untradeable) {
+        return {
+          routerAddress: quote.routerAddress,
+          expectedAmountOut: quote.expectedAmountOut,
+          isLocked: true,
+          hasBytecode: true,
+          venue: "nadfun",
+        };
+      }
+    } catch {
+      // try Flap / Uniswap
+    }
 
-    // isLocked on Lens means curve locked — graduated DEX tokens still trade.
-    // Only block mid-graduation (locked && !graduated).
-    const untradeable = await isTokenUntradeable({
-      publicClient: this.publicClient,
-      lensAddress,
-      tokenAddress: input.tokenAddress,
-    });
+    // 2) Flap.sh Portal (bonding curve) or graduated → Uniswap
+    try {
+      const { tryFlapQuote } = await import("../flap/quote.js");
+      const flap = await tryFlapQuote({
+        publicClient: this.publicClient,
+        tokenAddress: input.tokenAddress,
+        amountInWei: input.amountInWei,
+        isBuy: input.isBuy,
+      });
+      if (flap && flap.expectedAmountOut > 0n) {
+        return {
+          routerAddress: flap.routerAddress,
+          expectedAmountOut: flap.expectedAmountOut,
+          isLocked: flap.isLocked,
+          hasBytecode: true,
+          venue: flap.venue,
+          fee: flap.fee,
+        };
+      }
+    } catch {
+      // try Uniswap
+    }
+
+    // 3) Uniswap V2 / V3 (any WMON pool)
+    try {
+      const { tryUniswapQuote } = await import("../uniswap/quote.js");
+      const uni = await tryUniswapQuote({
+        publicClient: this.publicClient,
+        tokenAddress: input.tokenAddress,
+        amountInWei: input.amountInWei,
+        isBuy: input.isBuy,
+      });
+      if (uni && uni.expectedAmountOut > 0n) {
+        return {
+          routerAddress: uni.routerAddress,
+          expectedAmountOut: uni.expectedAmountOut,
+          isLocked: false,
+          hasBytecode: true,
+          venue: uni.venue,
+          fee: uni.fee,
+        };
+      }
+    } catch {
+      // fall through
+    }
 
     return {
-      routerAddress: quote.routerAddress,
-      expectedAmountOut: quote.expectedAmountOut,
-      isLocked: untradeable,
+      routerAddress: NADFUN_MAINNET.BONDING_CURVE_ROUTER,
+      expectedAmountOut: 0n,
+      isLocked: false,
       hasBytecode: true,
     };
+  }
+
+  async getBuyQuote(input: {
+    tokenAddress: `0x${string}`;
+    amountInWei: bigint;
+  }): Promise<QuoteResult> {
+    return this.quoteAcrossVenues({ ...input, isBuy: true });
   }
 
   async getSellQuote(input: {
     tokenAddress: `0x${string}`;
     amountInWei: bigint;
   }): Promise<QuoteResult> {
-    await assertConfiguredChainId(this.publicClient, this.env.MONAD_CHAIN_ID ?? 143);
-
-    const hasBytecode = await hasContractBytecode({
-      publicClient: this.publicClient,
-      tokenAddress: input.tokenAddress,
-    });
-
-    if (!hasBytecode) {
-      return {
-        routerAddress: NADFUN_MAINNET.BONDING_CURVE_ROUTER,
-        expectedAmountOut: 0n,
-        isLocked: false,
-        hasBytecode: false,
-      };
-    }
-
-    const lensAddress = this.env.NADFUN_LENS_ADDRESS ?? NADFUN_MAINNET.LENS;
-    const quote = await queryLensQuote({
-      publicClient: this.publicClient,
-      lensAddress,
-      tokenAddress: input.tokenAddress,
-      amountInWei: input.amountInWei,
-      isBuy: false,
-    });
-
-    const untradeable = await isTokenUntradeable({
-      publicClient: this.publicClient,
-      lensAddress,
-      tokenAddress: input.tokenAddress,
-    });
-
-    return {
-      routerAddress: quote.routerAddress,
-      expectedAmountOut: quote.expectedAmountOut,
-      isLocked: untradeable,
-      hasBytecode: true,
-    };
+    return this.quoteAcrossVenues({ ...input, isBuy: false });
   }
 }
 
@@ -246,6 +293,7 @@ export class RealSimulationProvider implements SimulationProvider {
     routerAddress: `0x${string}`;
     recipient: `0x${string}`;
     deadline: bigint;
+    fee?: number;
   }): Promise<{ ok: true } | { ok: false; reason: string }> {
     return simulateBuyTransaction({
       publicClient: this.publicClient,
@@ -256,6 +304,7 @@ export class RealSimulationProvider implements SimulationProvider {
       amountOutMin: input.amountOutMin,
       recipient: input.recipient,
       deadline: input.deadline,
+      fee: input.fee,
     });
   }
 
@@ -266,6 +315,7 @@ export class RealSimulationProvider implements SimulationProvider {
     routerAddress: `0x${string}`;
     recipient: `0x${string}`;
     deadline: bigint;
+    fee?: number;
   }): Promise<{ ok: true } | { ok: false; reason: string }> {
     return simulateSellTransaction({
       publicClient: this.publicClient,
@@ -276,6 +326,7 @@ export class RealSimulationProvider implements SimulationProvider {
       amountOutMin: input.amountOutMin,
       recipient: input.recipient,
       deadline: input.deadline,
+      fee: input.fee,
     });
   }
 }

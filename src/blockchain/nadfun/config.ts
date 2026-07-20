@@ -1,3 +1,6 @@
+import { FLAP_MAINNET } from "../flap/config.js";
+import { UNISWAP_MAINNET } from "../uniswap/config.js";
+
 /**
  * Official Nad.fun mainnet contract addresses.
  *
@@ -17,10 +20,14 @@ export const NADFUN_MAINNET = {
   V2_ROUTER: "0x8986C8fD44eb85294A725a7e61AF35E76bA26F91" as const,
 } as const;
 
+/** All venues the signer may call: Nad.fun + Flap Portal + Uniswap V2/V3. */
 export const DEFAULT_ALLOWED_ROUTERS = [
   NADFUN_MAINNET.BONDING_CURVE_ROUTER,
   NADFUN_MAINNET.DEX_ROUTER,
   NADFUN_MAINNET.V2_ROUTER,
+  FLAP_MAINNET.PORTAL,
+  UNISWAP_MAINNET.V2_ROUTER02,
+  UNISWAP_MAINNET.SWAP_ROUTER_02,
 ] as const;
 
 export function isV2Router(address: string): boolean {

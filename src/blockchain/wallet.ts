@@ -160,7 +160,7 @@ async function signAndBroadcast(input: {
 }
 
 /**
- * Restricted signer — only Nad.fun buy transactions to allowlisted routers.
+ * Restricted signer — only allowlisted venue routers (Nad.fun / Flap / Uniswap).
  *
  * Wallet-style flow: prepare + sign locally (so we always know the hash), then
  * broadcast the raw tx with retries / multi-RPC.
@@ -177,6 +177,8 @@ export async function executeNadfunBuy(input: {
   allowedRouters: readonly `0x${string}`[];
   gas?: bigint;
   gasPrice?: bigint;
+  /** Uniswap V3 fee tier when routing via SwapRouter02. */
+  fee?: number;
 }): Promise<`0x${string}`> {
   if (!isAllowlistedRouter(input.routerAddress, input.allowedRouters)) {
     throw createTradeError("ROUTER_NOT_ALLOWED");
@@ -188,6 +190,8 @@ export async function executeNadfunBuy(input: {
     recipient: input.walletAddress,
     deadline: input.deadline,
     routerAddress: input.routerAddress,
+    amountInWei: input.amountInWei,
+    fee: input.fee,
   });
 
   const gasPrice = input.gasPrice != null ? (input.gasPrice * 112n) / 100n : undefined;
@@ -205,7 +209,7 @@ export async function executeNadfunBuy(input: {
 }
 
 /**
- * Sell tokens for MON on allowlisted Nad.fun routers.
+ * Sell tokens for MON on allowlisted venue routers (Nad.fun / Flap / Uniswap).
  * Approves the router when allowance is insufficient, then submits sell.
  * Waits for receipts so callers never treat a reverted sell as success.
  */
@@ -221,6 +225,8 @@ export async function executeNadfunSell(input: {
   allowedRouters: readonly `0x${string}`[];
   gas?: bigint;
   gasPrice?: bigint;
+  /** Uniswap V3 fee tier when routing via SwapRouter02. */
+  fee?: number;
 }): Promise<`0x${string}`> {
   if (!isAllowlistedRouter(input.routerAddress, input.allowedRouters)) {
     throw createTradeError("ROUTER_NOT_ALLOWED");
@@ -273,6 +279,7 @@ export async function executeNadfunSell(input: {
     recipient: input.walletAddress,
     deadline: input.deadline,
     routerAddress: input.routerAddress,
+    fee: input.fee,
   });
 
   // V2 sells often need >300k; estimate with buffer, floor at 450k so we don't OOG.

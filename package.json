@@ -2,7 +2,7 @@
   "name": "monad-x-trade-assistant",
   "version": "0.1.0",
   "private": true,
-  "description": "MonEx Trade Assistant — X bot + web desk for Nad.fun buys on Monad",
+  "description": "MonEx Trade Assistant — X bot + web desk for Nad.fun / Flap / Uniswap trades on Monad",
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",

@@ -3,6 +3,9 @@ import { bondingCurveRouterAbi } from "./abis/bonding-curve-router.js";
 import { dexRouterAbi } from "./abis/dex-router.js";
 import { nadfunRouterV2Abi } from "./abis/nadfun-router-v2.js";
 import { isDexRouter, isV2Router } from "./config.js";
+import { isFlapPortal } from "../flap/config.js";
+import { isUniswapRouter } from "../uniswap/config.js";
+import { buildSellTransaction } from "./build-sell.js";
 
 export async function simulateSellTransaction(input: {
   publicClient: PublicClient;
@@ -13,8 +16,28 @@ export async function simulateSellTransaction(input: {
   amountOutMin: bigint;
   recipient: `0x${string}`;
   deadline: bigint;
+  fee?: number;
 }): Promise<{ ok: true } | { ok: false; reason: string }> {
   try {
+    if (isFlapPortal(input.routerAddress) || isUniswapRouter(input.routerAddress)) {
+      const data = buildSellTransaction({
+        tokenAddress: input.tokenAddress,
+        amountIn: input.amountIn,
+        amountOutMin: input.amountOutMin,
+        recipient: input.recipient,
+        deadline: input.deadline,
+        routerAddress: input.routerAddress,
+        fee: input.fee,
+      });
+      await input.publicClient.call({
+        account: input.account,
+        to: input.routerAddress,
+        data,
+        value: 0n,
+      });
+      return { ok: true };
+    }
+
     const params = {
       amountIn: input.amountIn,
       amountOutMin: input.amountOutMin,
