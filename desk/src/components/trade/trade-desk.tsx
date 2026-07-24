@@ -332,7 +332,7 @@ export function TradeDesk() {
       invalid_client: "X app secret is wrong on the server.",
       invalid_grant: "Login code expired. Try Continue with X once more.",
       unauthorized_client: "X app credentials need updating (client secret).",
-      user_failed: "Couldn’t load your X profile.",
+      user_failed: "Couldn’t load your X profile. Try Continue with X again.",
       oauth_not_configured: "X login isn’t configured yet.",
       callback_error: "Server error during login. Try again shortly.",
     };

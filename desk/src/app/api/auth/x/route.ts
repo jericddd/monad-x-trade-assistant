@@ -35,7 +35,8 @@ export async function GET() {
       response_type: "code",
       client_id: clientId,
       redirect_uri: callbackUrl,
-      scope: "users.read offline.access",
+      // X requires tweet.read for GET /2/users/me even when only reading profile.
+      scope: "tweet.read users.read offline.access",
       state,
       code_challenge: codeChallenge,
       code_challenge_method: "S256",
