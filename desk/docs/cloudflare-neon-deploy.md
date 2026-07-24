@@ -107,11 +107,14 @@ Confirm:
 
 ## Part 5 — X Developer Portal
 
-OAuth 2.0 callback URL:
+OAuth 2.0 callback URL (trade desk):
 
 ```text
-https://packs.monexmonad.xyz/api/auth/x/callback
+https://trade.monexmonad.xyz/api/auth/x/callback
 ```
+
+Website login scopes must include `tweet.read users.read offline.access`.  
+X requires `tweet.read` for `GET /2/users/me` even when only loading the profile.
 
 ---
 

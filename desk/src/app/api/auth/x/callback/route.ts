@@ -87,13 +87,19 @@ export async function GET(request: NextRequest) {
       headers: { Authorization: `Bearer ${tokenData.access_token}` },
     });
     if (!userRes.ok) {
-      console.error("x_oauth_user_failed", userRes.status);
-      return redirectHome("user_failed");
+      const detail = await userRes.text().catch(() => "");
+      console.error("x_oauth_user_failed", userRes.status, detail.slice(0, 300));
+      return redirectHome("user_failed", `HTTP ${userRes.status}`);
     }
 
-    const { data: xUser } = (await userRes.json()) as {
-      data: { id: string; username: string; profile_image_url?: string };
+    const userPayload = (await userRes.json()) as {
+      data?: { id: string; username: string; profile_image_url?: string };
     };
+    const xUser = userPayload.data;
+    if (!xUser?.id || !xUser.username) {
+      console.error("x_oauth_user_failed", "missing_user_payload");
+      return redirectHome("user_failed", "missing_user_payload");
+    }
 
     const user = await prisma.user.upsert({
       where: { xUserId: xUser.id },
