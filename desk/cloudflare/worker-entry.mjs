@@ -17,9 +17,13 @@ export default {
 
   async scheduled(controller, env, ctx) {
     const base = (env.NEXT_PUBLIC_APP_URL ?? "https://trade.monexmonad.xyz").replace(/\/$/, "");
+    if (!env.CRON_SECRET) {
+      console.error("scheduled expire cron skipped: CRON_SECRET not configured");
+      return;
+    }
     const request = new Request(`${base}/api/cron/expire`, {
-      method: "GET",
-      headers: env.CRON_SECRET ? { Authorization: `Bearer ${env.CRON_SECRET}` } : {},
+      method: "POST",
+      headers: { Authorization: `Bearer ${env.CRON_SECRET}` },
     });
 
     ctx.waitUntil(

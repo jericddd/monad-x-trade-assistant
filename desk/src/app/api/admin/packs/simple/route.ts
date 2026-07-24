@@ -1,16 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { requireAdmin } from "@/lib/auth";
 import {
   createSimpleImportPreview,
   extractImagesFromZip,
 } from "@/services/simple-pack-import";
-
-async function requireAdmin() {
-  const session = await getSession();
-  if (!session.userId || !session.isAdmin) {
-    throw new Error("FORBIDDEN");
-  }
-}
 
 function parseDuplicateFilenames(raw: string | null): string[] | undefined {
   if (!raw?.trim()) return undefined;

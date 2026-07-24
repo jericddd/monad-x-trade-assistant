@@ -274,6 +274,13 @@ export function createXClient(env: Record<string, unknown>): XClient {
   const accessTokenSecret = sanitizeSecret(env.X_ACCESS_TOKEN_SECRET);
 
   if (!apiKey || !apiSecret || !accessToken || !accessTokenSecret) {
+    const tradingEnabled = env.TRADING_ENABLED === true || env.TRADING_ENABLED === "true";
+    const dryRun =
+      env.TRADE_DRY_RUN === undefined || env.TRADE_DRY_RUN === true || env.TRADE_DRY_RUN === "true";
+    // Live trading must not silently fall back to MockXClient.
+    if (tradingEnabled && !dryRun) {
+      throw new Error("X OAuth credentials are required when live trading is enabled");
+    }
     return new MockXClient();
   }
 

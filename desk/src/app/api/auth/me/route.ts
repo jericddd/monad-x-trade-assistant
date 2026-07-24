@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { getSession, isAdminXUser } from "@/lib/auth";
 
 export async function POST() {
   const session = await getSession();
@@ -10,13 +10,14 @@ export async function POST() {
 export async function GET() {
   const session = await getSession();
   if (!session.userId) return NextResponse.json({ user: null });
+  const isAdmin = Boolean(session.xUserId && isAdminXUser(session.xUserId));
   return NextResponse.json({
     user: {
       id: session.userId,
       xUserId: session.xUserId,
       xUsername: session.xUsername,
       xProfileImage: session.xProfileImage,
-      isAdmin: session.isAdmin,
+      isAdmin,
     },
   });
 }

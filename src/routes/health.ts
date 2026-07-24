@@ -37,6 +37,7 @@ export function healthResponse(env: Record<string, unknown>): Response {
   const tradingEnabled = asBool(env.TRADING_ENABLED, false);
   const dryRun = asBool(env.TRADE_DRY_RUN, true);
 
+  // Keep health useful for ops, but avoid advertising site-secret / auth readiness.
   return Response.json({
     ok: true,
     service: "monad-x-trade-assistant",
@@ -49,7 +50,6 @@ export function healthResponse(env: Record<string, unknown>): Response {
       botUserResolvedViaUsersMe: xOAuthConfigured,
       xOAuthConfigured,
       rpcConfigured: hasSecret(env.MONAD_RPC_URL),
-      siteApiConfigured: hasSecret(env.SITE_API_SECRET),
     },
   });
 }
