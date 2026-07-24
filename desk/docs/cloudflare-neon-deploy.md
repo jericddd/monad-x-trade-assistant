@@ -82,7 +82,7 @@ Add as **Secrets** (encrypted):
 | `X_CALLBACK_URL` | `https://packs.monexmonad.xyz/api/auth/x/callback` |
 | `X_BOT_WEBHOOK_SECRET` | shared with MonEx worker |
 | `ADMIN_X_USER_IDS` | your X user id |
-| `CRON_SECRET` | random string |
+| `CRON_SECRET` | random string (required — cron fails closed without it) |
 | `R2_PUBLIC_URL` | R2 public bucket URL |
 
 Optional (for claims later): `NFT_CONTRACT_ADDRESS`, `MINT_WALLET_PRIVATE_KEY`, `MONAD_RPC_URL`

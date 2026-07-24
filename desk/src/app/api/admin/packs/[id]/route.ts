@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { requireAdmin } from "@/lib/auth";
 import { getPackPreview, updatePackSettings, deletePack } from "@/services/admin-pack";
 import { publishImport, rejectImport } from "@/services/pack-import";
-
-async function requireAdmin() {
-  const session = await getSession();
-  if (!session.userId || !session.isAdmin) throw new Error("FORBIDDEN");
-}
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {

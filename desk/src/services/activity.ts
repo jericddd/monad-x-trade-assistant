@@ -68,16 +68,7 @@ export async function getHomeMetrics() {
 export async function getPublicPacks() {
   const now = new Date();
 
-  // Heal packs that were published as HIDDEN before visibility fix
-  await prisma.pack.updateMany({
-    where: {
-      active: true,
-      websiteEnabled: true,
-      visibility: PackVisibility.HIDDEN,
-    },
-    data: { visibility: PackVisibility.PUBLIC },
-  });
-
+  // Do not auto-unhide HIDDEN packs — admin visibility must stick.
   return prisma.pack.findMany({
     where: {
       active: true,

@@ -9,8 +9,10 @@ import { routeXCommand } from "@/services/x-command-parser";
  */
 export async function POST(request: NextRequest) {
   try {
-    const secret = request.headers.get("x-bot-webhook-secret");
-    if (process.env.X_BOT_WEBHOOK_SECRET && secret !== process.env.X_BOT_WEBHOOK_SECRET) {
+    const expected = process.env.X_BOT_WEBHOOK_SECRET?.trim();
+    const secret = request.headers.get("x-bot-webhook-secret")?.trim();
+    // Fail closed: missing secret must not let callers spoof pack opens as any X user.
+    if (!expected || !secret || secret !== expected) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

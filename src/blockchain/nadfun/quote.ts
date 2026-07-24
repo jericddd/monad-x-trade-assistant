@@ -347,6 +347,12 @@ export function shouldUseMockBlockchain(env: Partial<AppEnv>): boolean {
     return true;
   }
   if (!env.MONAD_RPC_URL || !env.NADFUN_LENS_ADDRESS) {
+    // Parsed AppEnv uses booleans; refuse silent mock under live trading.
+    if (env.TRADING_ENABLED === true && env.TRADE_DRY_RUN === false) {
+      throw new Error(
+        "MONAD_RPC_URL and NADFUN_LENS_ADDRESS are required when live trading is enabled",
+      );
+    }
     return true;
   }
   return false;
